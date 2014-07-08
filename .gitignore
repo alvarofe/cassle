@@ -1,3 +1,6 @@
 *.pyc
 ssl/*.pyc
 utils/*.pyc
+*.swp
+ssl/*.swp
+utils/*.swp
