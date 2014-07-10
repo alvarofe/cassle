@@ -1,3 +1,11 @@
+###############################################################################################
+### Name: ssl_types.py
+### Author: Alvaro Felipe Melchor - alvaro.felipe91@gmail.com
+### Twitter : @alvaro_fe
+### University of Alcala de Henares
+###############################################################################################
+
+
 #All definitions of tls
 #All values are express in hex
 

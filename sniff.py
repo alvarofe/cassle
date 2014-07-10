@@ -1,6 +1,12 @@
+#! /usr/bin/env python
 
-# pynids Example
-# $Id: Example,v 1.3 2005/01/27 04:53:45 mjp Exp $
+###############################################################################################
+### Name: sniff.py
+### Author: Alvaro Felipe Melchor - alvaro.felipe91@gmail.com
+### Twitter : @alvaro_fe
+### University of Alcala de Henares
+###############################################################################################
+
 
 #import os
 import sys
@@ -28,11 +34,13 @@ def handleTcpStream(tcp):
             tcp.client.collect = 1
             #tcp.server.collect = 1
     elif tcp.nids_state == nids.NIDS_DATA:
+        #TODO manage better tcp stream because we are only catching tcp stream when it is closed
         # keep all of the stream's new data
         tcp.discard(0)
     elif tcp.nids_state in end_states:
         #print "addr:", tcp.addr
         #print "To client:"
+        #TODO try to have only one instance of this class and only a set method to put inside the message to trigger all the process
         SSLStream(tcp.client.data[:tcp.client.count],tcp.addr)
         #tcp.client.collect = 0
         #print util.hexdump(tcp.client.data[:tcp.client.count])

@@ -1,3 +1,11 @@
+###############################################################################################
+### Name: ssl_stream.py
+### Author: Alvaro Felipe Melchor - alvaro.felipe91@gmail.com
+### Twitter : @alvaro_fe
+### University of Alcala de Henares
+###############################################################################################
+
+
 #This gonna be a class that we'll be initialized with raw data. self.messages will contain all the tls message related with handshake
 
 from ssl import ssl_types
@@ -9,14 +17,14 @@ from ssl.ssl_verification import SSLVerificationDispatch
 #The work of this class is to decode and organize all the messages that we captured
 class SSLStream():
     """
-    Manage a SSLStream. Basically split tls_records retrieve handshake messages 
+    Manage a SSLStream. Basically split tls_records retrieve handshake messages
     to validate after through SSLVerificationDispatch.
 
-    Remeber that we are validating in pasive mode that implies that the certificates 
-    are captured later due to some connections over TCP are open until the user close 
+    Remeber that we are validating in pasive mode that implies that the certificates
+    are captured later due to some connections over TCP are open until the user close
     the tab. If we used libpcap when the flag "flush" appear we could process that message
     but we are using libnids and only we are listen when the connection is closed.
-    That produce some delays in the verification process that could penalize the 
+    That produce some delays in the verification process that could penalize the
     performance in the whole software.
     """
 
@@ -25,7 +33,6 @@ class SSLStream():
         self._split_tls_records(raw_data)
         self._get_handshake_tls_records()
         self._process_handshake_messages()
-        
     def _consistency_of_message(self,raw_data):
         """
         Basically we need to see if the length field match correctly.
@@ -42,9 +49,7 @@ class SSLStream():
         except:
             return False
 
-        
 
-#TODO create other file to process each message special focus in certificate message        
     def _process_handshake_messages(self):
        # Here we are gonna save all the data necessary to validate the authentication of the connection.
        # Since OCSP staplign is not widely deployed we will do everything trough certificatev
@@ -54,29 +59,29 @@ class SSLStream():
             if message[10:12] == ssl_types.TLS_H_TYPE_SERVER_HELLO:
                 if self._consistency_of_message(message[10:]):
                     pass
-                
             elif message[10:12] == ssl_types.TLS_H_TYPE_CERTIFICATE:
                 if self._consistency_of_message(message[10:]):
+                    #print 'Certificate'
                     data['certificate'] = message
-                    
             elif message[10:12] == ssl_types.TLS_H_TYPE_SERVER_KEY_EXCHANGE:
                 if self._consistency_of_message(message[10:]):
-                   pass 
-               
+                   pass
             elif message[10:12] == ssl_types.TLS_H_TYPE_SERVER_HELLO_DONE:
                 if self._consistency_of_message(message[10:]):
-                   pass 
-               
+                   pass
             elif message[10:12] == ssl_types.TLS_H_TYPE_CERTIFICATE_STATUS:
                 if self._consistency_of_message(message[10:]):
+                    #print 'Certificate Status'
                    # If you want save ocsp_stapling to verify the authentication
                    # you only should add to data['ocsp_stapling'] 
                     pass
             else:
                 if not self._consistency_of_message(message[10:]):
                     pass
+                    #print 'Finished'
         SSLVerificationDispatch(data)
- 
+
+
     def _get_handshake_tls_records(self):
         """
         Iterate over records to extract handshake messages
@@ -86,6 +91,7 @@ class SSLStream():
             #For each record we should determine if it is a hanshake message
             if record[0:2] == ssl_types.TLS_HANDSHAKE:
                 self._handshake_messages.append(record)
+
 
     def _get_tls_version(self, data):
         """
@@ -102,7 +108,8 @@ class SSLStream():
                 return 'TLS 1.2'
         else:
             return 'bad tls_version'
-            
+
+
     def _split_tls_records(self,raw_data):
         """
         Raw_data may contain various tls_records. So for more analyse of them we need to split it
@@ -121,18 +128,16 @@ class SSLStream():
                 #print self._get_tls_version(s[2:6])
                 try:
                     length = int(s[6:10], 16)
+                    next_record = 10 + (length * 2)
+                    try:
+                        s[next_record+1]
+                    except:
+                        #We reach the final message
+                        end = 1
+                        return
+                    self._tls_records.append(s[:next_record])
+                    s = s[next_record:]
                 except:
                     #TODO Some times something happens here. 
                     print s
-                next_record = 10 + (length * 2)
-                #Maybe there is not a next_record we must access to it to see if a exception jump
-                try:
-                    s[next_record+1]
-                except:
-                    #We reach the final message
-                    end = 1
-                    return 
-                self._tls_records.append(s[:next_record])
-                s = s[next_record:]                    
 
-        

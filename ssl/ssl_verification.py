@@ -1,10 +1,21 @@
+###############################################################################################
+### Name: ssl_verification.py
+### Author: Alvaro Felipe Melchor - alvaro.felipe91@gmail.com
+### Twitter : @alvaro_fe
+### University of Alcala de Henares
+###############################################################################################
 
 from ssl.auth_certificate import AuthCertificate
+import Queue
+import threading
+
+screen_lock =threading.Semaphore(value=1)
+
 
 class SSLVerificationDispatch():
 
     def __init__(self, data):
-        
+
         self.certificate = None
         self.ocsp_stapling = None
 
@@ -20,10 +31,16 @@ class SSLVerificationDispatch():
         #Do everything related with certificate
         if self.certificate is not None:
             #verify certificate
-            AuthCertificate(self.certificate.decode('hex'))
+            result_queue = Queue.Queue()
+            auth_cert_thread = AuthCertificate(self.certificate,result_queue, screen_lock)
+            auth_cert_thread.daemon = True
+            auth_cert_thread.start()
+            #print result_queue.get()
+
         else:
             pass
 
+    #TODO add everything to parse and use ocsp_stapling firefox support ocsp_stapling
     def verify_auth_ocsp_stapling(self):
         if self.ocsp_stapling is not None:
             #verify connection through ocsp_stapling
