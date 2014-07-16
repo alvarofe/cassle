@@ -5,22 +5,22 @@
 ### University of Alcala de Henares
 ###############################################################################################
 
-from ssl.auth_certificate import AuthCertificate
+from tls.auth_certificate import AuthCertificate
 import Queue
 import threading
 
 screen_lock =threading.Semaphore(value=1)
 
 
-class SSLVerificationDispatch():
+class TLSVerificationDispatch():
 
     def __init__(self, data):
 
-        self.certificate = None
+        self.certificates = None
         self.ocsp_stapling = None
 
         if 'certificate' in data:
-            self.certificate = data['certificate']
+            self.certificates = data['certificate']
         if 'ocsp_stapling' in data:
             self.ocsp_stapling = data['ocsp_stapling']
         self.verify_auth_certificate()
@@ -29,10 +29,10 @@ class SSLVerificationDispatch():
 
     def verify_auth_certificate(self):
         #Do everything related with certificate
-        if self.certificate is not None:
+        if self.certificates is not None:
             #verify certificate
             result_queue = Queue.Queue()
-            auth_cert_thread = AuthCertificate(self.certificate,result_queue, screen_lock)
+            auth_cert_thread = AuthCertificate(self.certificates,result_queue, screen_lock)
             auth_cert_thread.daemon = True
             auth_cert_thread.start()
             #print result_queue.get()

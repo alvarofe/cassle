@@ -11,7 +11,7 @@ import subprocess
 import sys,os
 from config import Config
 
-f = file('config/config.cfg')
+f = file('../config/config.cfg')
 cfg = Config(f).config
 
 if __name__ == '__main__':

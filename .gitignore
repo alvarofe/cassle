@@ -4,3 +4,5 @@ utils/*.pyc
 *.swp
 ssl/*.swp
 utils/*.swp
+dump
+log

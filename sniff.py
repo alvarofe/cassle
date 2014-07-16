@@ -1,74 +1,55 @@
 #! /usr/bin/env python
 
-###############################################################################################
+############################################################################################### 
 ### Name: sniff.py
 ### Author: Alvaro Felipe Melchor - alvaro.felipe91@gmail.com
 ### Twitter : @alvaro_fe
-### University of Alcala de Henares
+### University of Alcala de Henares 
 ###############################################################################################
 
-
-#import os
 import sys
-import nids
-import signal
+import pcap
+import argparse
+from utils.util import decode_packet
+# import nss.nss as nss
+#import signal
+# import os
 
-#from utils import util
-from ssl.ssl_stream import SSLStream
+# TODO add configuration file a clean code
 
-NOTROOT = "nobody"   # edit to taste
-end_states = (nids.NIDS_CLOSE, nids.NIDS_TIMEOUT, nids.NIDS_RESET)
+class sniff:
+    def __init__(self):
+        parser = argparse.ArgumentParser(description='Certificate Validation')
+        parser.add_argument('-i','--interface',help='specify interface to sniff')
+        parser.set_defaults(interface='en0')
+        options = parser.parse_args()
+        if options.interface == None:
+            print parser.usage
+            sys.exit(0)
 
-def signal_handler(signal, frame):
-        print('You pressed Ctrl+C!')
-        sys.exit(0)
+        self.interface = options.interface
 
-def handleTcpStream(tcp):
-    #print "tcps -", str(tcp.addr), " state:", tcp.nids_state>
-    if tcp.nids_state == nids.NIDS_JUST_EST:
-        # new to us, but do we care?
-        ((src, sport), (dst, dport)) = tcp.addr
-        #print tcp.addr
-        if dport  == 443:
-            #print "collecting..."
-            tcp.client.collect = 1
-            #tcp.server.collect = 1
-    elif tcp.nids_state == nids.NIDS_DATA:
-        #TODO manage better tcp stream because we are only catching tcp stream when it is closed
-        # keep all of the stream's new data
-        tcp.discard(0)
-    elif tcp.nids_state in end_states:
-        #print "addr:", tcp.addr
-        #print "To client:"
-        #TODO try to have only one instance of this class and only a set method to put inside the message to trigger all the process
-        SSLStream(tcp.client.data[:tcp.client.count],tcp.addr)
-        #tcp.client.collect = 0
-        #print util.hexdump(tcp.client.data[:tcp.client.count])
-        #print tcp.client.data[:tcp.client.count] # WARNING - as above
+    def handler_signal_term(signum,frame):
+        print '%s' % sys.exc_type
+        print 'shutting down'
 
-def main():
+    def sniff(self):
+        p = pcap.pcapObject()
+        dev = self.interface
+        net, mask = pcap.lookupnet(dev)
+        p.open_live(dev, 1600, 0, 100)
+        p.setfilter("tcp src port 443", 0, 0)
+        # print 'The nss database is %s' % (self.db_name)
+        #signal.signal(signal.SIGTERM,self.handler_signal_term)
+        try:
+            while 1:
+                p.dispatch(1, decode_packet)
+        except KeyboardInterrupt:
+            print '%s' % sys.exc_type
+            print 'shutting down'
+            print '%d packets received, %d packets dropped, %d packets dropped by interface' % p.stats()
 
-    #nids.param("pcap_filter", "tcp")       # bpf restrict to TCP only, note
-                                            # libnids caution about fragments
-    signal.signal(signal.SIGINT, signal_handler)
-    #nids.param("scan_num_hosts", 0)         # disable portscan detection
-
-    #if len(sys.argv) == 2:                  # read a pcap file?
-        #nids.param("filename", sys.argv[1])
-
-    nids.init()
-
-    nids.register_tcp(handleTcpStream)
-    #print "pid", os.getpid()
-
-    # Loop forever (network device), or until EOF (pcap file)
-    # Note that an exception in the callback will break the loop!
-    try:
-        nids.run()
-    except nids.error, e:
-        print "nids/pcap error:", e
-    #except Exception,e:
-        #print "misc. exception (runtime error in user callback?):", e
 
 if __name__ == '__main__':
-    main()
+    s = sniff()
+    s.sniff()
