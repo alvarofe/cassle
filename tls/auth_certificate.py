@@ -24,9 +24,10 @@ from db.database import database
 from tls.ocsp import Ocsp
 import subprocess, tempfile
 from nss.error import NSPRError
-
-#TODO add rfc support, improved ocsp with CT 
-
+from  pyasn1.codec.der import decoder, encoder
+from pyasn1_modules import rfc2560, rfc2459
+from pyasn1.type import univ
+#TODO add verification based in the configuration file
 
 
 from config import Config
@@ -55,7 +56,7 @@ logging.basicConfig(filename=logPath,format='%(asctime)s --  %(levelname)s:%(mes
 
 system = platform.system()
 
-#TODO save in a list each nss.Certificate because we use it a lot of
+#TODO add support to SSLBacklist and CT. Research more
 
 class AuthCertificate(threading.Thread):
     """
@@ -72,9 +73,9 @@ class AuthCertificate(threading.Thread):
 
         self.cert_nss = list()
 
-        certdb = os.path.expanduser(cfg.config.NSS_DB_DIR)
+        self.certdb_dir = os.path.expanduser(cfg.config.NSS_DB_DIR)
 
-        nss.nss_init(certdb)
+        nss.nss_init(self.certdb_dir)
         self.certdb = nss.get_default_certdb()
 
         for i in xrange(0,len(self.certs)):
@@ -83,6 +84,7 @@ class AuthCertificate(threading.Thread):
             except:
                 break
 
+        self.ocsp =  Ocsp(self.certs[1],self.certs[0])
 
         db_name = cfg.db.db_name
         self.db_pin = database(db_name, cfg.db.coll_name_pinning)
@@ -92,13 +94,33 @@ class AuthCertificate(threading.Thread):
 
     def run(self):
         #TODO add here execution based on the configuration file
+        if len(self.cert_nss) == 0:
+            return
         self.verify_cert_through_rfc()
         self.verify_dnssec_tlsa()
         self.verify_cert_with_pinning()
         self.verify_cert_with_icsy_notary()
         self.lock.acquire()
         self.verify_ocsp()
+        self.verify_ct()
         self.lock.release()
+
+
+    def verify_ct(self):
+        #self.ocsp.check_certificate_transparency()
+        cert, _ = decoder.decode(self.certs[0],asn1Spec=rfc2459.Certificate())
+        tbsCertificate = cert.getComponentByName('tbsCertificate')
+        extensions = tbsCertificate.getComponentByName('extensions')
+        sct = None
+        for ext in extensions:
+            if ext.getComponentByPosition(0) == univ.ObjectIdentifier((1,3,6,1,4,1,11129,2,4,2)):
+                sct =  str(ext.getComponentByPosition(2)).encode('hex')
+        if sct != None:
+            print 'Signed Certificate Timestamp found ' + sct
+        else:
+            self.ocsp.check_certificate_transparency()
+
+
 
     """
     Methods that implement verification using the certificate
@@ -122,40 +144,32 @@ class AuthCertificate(threading.Thread):
             s.update(self.certs[0])
             res = s.hexdigest()
             if res == hash_tlsa:
-                print 'DANE secure'
+                print colored('The certificate with id %s is safe through DANE' % self.cert_nss[0].serial_number, 'magenta')
+            else:
+                print colored('The certificate with id %s does not implement DANE' % self.cert_nss[0].serial_number, 'white')
         except:
             #print 'No TLSA'
             pass
 
-    def _compare_usage(self,intended,approved):
-            if approved & intended:
-                return True
-            else:
-                return False
-
-    def _log_fail(self,num_cert,ca_name):
-            cn_cert = self.cert_nss[num_cert]
-            exist = self.db_rfc.get(cn_cert.make_ca_nickname())
-            if exist is None:
-                self.db_rfc.set_rfc(cn_cert.make_ca_nickname())
-                # print cn_cert
-                logging.info("You don't trust in this certificate when you connected to %s \n %s",
-                                ca_name, cn_cert)
 
     def verify_ocsp(self):
-        try:
-            ocsp = Ocsp(self.certs[1],self.certs[0])
-        except IndexError:
+
+        status, certId = self.ocsp.check_ocsp()
+        if status == None:
+            print colored('The certificate with id  %s does not have OCSP URI' % self.cert_nss[0].serial_number,'white')
             return
-        ocsp.check_ocsp()
+        if status == 'revoked':
+            self._notify_mitm(title='OCSP-MITM')
+            print colored('This certificate with id  %s is revoked' % certId,'red')
+        else:
+            print colored('This certificate with id %s is not revoked' % certId,'cyan')
+
 
     #TODO refactor this
     def verify_cert_through_rfc(self):
             """
             This function try verify the certificate through RFC espefication. We are using NSS to do it
             """
-            if len(self.cert_nss) == 0:
-                return
             cert_is_valid = False
             approved_usage = not intended_usage
             try:
@@ -168,65 +182,26 @@ class AuthCertificate(threading.Thread):
                 approved_usage = cert.verify_now(self.certdb,True,intended_usage,None)
 
             except NSPRError:
-
-                #Refactor all this chain of try and except. The pattern is always the same so is possible to refactor it, find the way to do it    
-
-                # The exception could happen due to miss of the intermediate certificate in NSS-DB
                 length = len(self.certs)
-                if length == 2:
-                    self._add_certiticate_to_nssdb(1,name=cert.issuer.common_name)
-                    try:
-                        approved_usage = cert.verify_now(self.certdb,True,intended_usage,None)
-                        #print colored('This certificate %s is safe through the RFC process ' % cert.make_ca_nickname(),'green')
-                    except NSPRError:
-                        cert_is_valid = self._compare_usage(intended_usage, approved_usage)
-                        if cert_is_valid == False:
-                            self._log_fail(0, ca_name)
-                            self._notify_mitm(title=ca_name)
-                            self.lock.acquire()
-                            print colored('This certificate %s is not safe through the RFC process ' % ca_name,'red')
-                            self.lock.release()
-
-
-                elif length == 3:
-                    # Something wrong happened maybe was because the intermediate certificate ain't in the NSS-DB            
-                    self._add_certiticate_to_nssdb(1,name=cert.issuer.common_name)
-                    try:
-                        approved_usage = cert.verify_now(self.certdb,True,intended_usage,None)
-                        #print colored('This certificate %s is safe through the RFC process ' % ca_name,'green')
-                    except NSPRError:
-                        cert_is_valid = self._compare_usage(intended_usage, approved_usage)
-                        if cert_is_valid == False:
-                            self._log_fail(2, ca_name)
-                            self._notify_mitm(title=ca_name)
-                            self.lock.acquire()
-                            print colored('This certificate %s is not safe through the RFC process ' % ca_name,'red')
-                            self.lock.release()
-                            # print nss.cert_usage_flags(approved_usage)
-                            # print e.strerror
-
-                elif length == 4:
-                    self._add_certiticate_to_nssdb(1,name=cert.issuer.common_name)
+                self._add_certiticate_to_nssdb(1,name=cert.issuer.common_name)
+                if length == 4:
                     inter = self.cert_nss[1]
-                    self._add_certificate_to_nssdb(2,name=inter.issuer.common_name)
-                    try:
-                        approved_usage = cert.verify_now(self.certdb,True,intended_usage,None)
-                        # print colored('This certificate %s is safe through the RFC process ' % ca_name,'green')
-                    except NSPRError:
-                        cert_is_valid = self._compare_usage(intended_usage, approved_usage)
-                        if cert_is_valid == False:
-                            self._log_fail(3, ca_name)
-                            self._notify_mitm(title=ca_name)
-                            self.lock.acquire()
-                            print colored('This certificate %s is not safe through the RFC process ' % ca_name,'red')
-                            self.lock.release()
-
-
+                    self._add_certiticate_to_nssdb(2,name=inter.issuer.common_name)
+                try:
+                    approved_usage = cert.verify_now(self.certdb,True, intended_usage, None)
+                except NSPRError:
+                    pass
             cert_is_valid = self._compare_usage(intended_usage, approved_usage)
             if cert_is_valid == True:
                 self.lock.acquire()
                 print colored('This certificate %s is safe through the RFC process ' % ca_name,'green')
                 self.lock.release()
+            else:
+                self.lock.acquire()
+                print colored('This certificate %s is not safe through the RFC process ' % ca_name,'red')
+                self.lock.release()
+                self._log_fail()
+                self._notify_mitm(title='RFC-MITM')
 
 
     def verify_cert_with_pinning(self):
@@ -235,8 +210,6 @@ class AuthCertificate(threading.Thread):
         import sha3
         s = hashlib.new("sha3_512")
         #aux = nss.Certificate(self.certs[0],self.certdb)
-        if len(self.cert_nss) == 0:
-            return
         try:
             # We extract SubjectPublicKeyInfo. Why? Because everybody say that is the best part of the certificate
             #to do that
@@ -284,8 +257,6 @@ class AuthCertificate(threading.Thread):
         import hashlib
         import dns
         from dns import resolver
-        if len(self.cert_nss) == 0:
-            return
         cert = self.cert_nss[0]
         s = hashlib.new("sha1")
         s.update(self.certs[0])
@@ -293,7 +264,7 @@ class AuthCertificate(threading.Thread):
         try:
             result =  resolver.query(address,rdtype=dns.rdatatype.TXT)[0].__str__().split()
         except:
-            print s.hexdigest()
+            #icsy_notary doesn't have that certificate
             return
         validated = int(result[4].split('=')[1][0])
         first_seen = int(result[1].split('=')[1])
@@ -309,7 +280,7 @@ class AuthCertificate(threading.Thread):
             if s - times_seen > 1:
                 cad = "This certificate %s is not ENOUGH secure according to icsi_notary" % (cert.make_ca_nickname())
                 self.lock.acquire()
-                print colored(cad,'magenta')
+                print colored(cad,'red')
                 self.lock.release()
             else:
                 cad = "This certificate %s IS SECURE through icsi_notary" % (cert.make_ca_nickname())
@@ -318,6 +289,21 @@ class AuthCertificate(threading.Thread):
                 self.lock.release()
 
 
+    def _compare_usage(self,intended,approved):
+            if approved & intended:
+                return True
+            else:
+                return False
+
+    def _log_fail(self):
+            cn_cert = self.cert_nss[0]
+            name = cn_cert.make_ca_nickname()
+            exist = self.db_rfc.get(name)
+            if exist is None:
+                self.db_rfc.set_rfc(cn_cert.make_ca_nickname())
+                # print cn_cert
+                logging.info("You don't trust in this certificate when you connected to %s \n %s",
+                                name, cn_cert)
 
     def _notify_mitm(self,title):
         if system == "Darwin":
@@ -339,7 +325,7 @@ class AuthCertificate(threading.Thread):
             try:
                 tmp.write(M2Crypto.X509.load_cert_string(self.certs[cert],FORMAT_DER).as_pem())
             except:
-                print self.cert_nss[cert] 
+                print self.cert_nss
             tmp.flush
             tmp.seek(0)
             if not trust:

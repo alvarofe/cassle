@@ -15,6 +15,7 @@ import urllib2
 sha1oid = univ.ObjectIdentifier((1, 3, 14, 3, 2, 26))
 
 
+#TODO research CT
 
 class ValueOnlyBitStringEncoder(encoder.encoder.BitStringEncoder):
         #These methods just do not encode tag and legnth fields of TLV
@@ -39,6 +40,8 @@ class Ocsp:
         self.user_cert = user_cert
         self._extract_ocsp_uri()
         self.valueOnlyBitStringEncoder = ValueOnlyBitStringEncoder()
+        self.tbsResponseData = None
+        self.get_ocsp_response()
 
     def _extract_ocsp_uri(self):
         cert = M2Crypto.X509.load_cert_string(self.user_cert,FORMAT_DER)
@@ -60,33 +63,31 @@ class Ocsp:
         self.ocsp_url = ocsp_url
 
 
-    def check_ocsp(self):
-        if self.ocsp_url is not None:
-            try:
-                issuerCert, _ = decoder.decode(self.issuer_cert,asn1Spec=rfc2459.Certificate())
-                userCert, _ = decoder.decode(self.user_cert, asn1Spec=rfc2459.Certificate())
-            except:
+    def check_certificate_transparency(self):
+        if self.tbsResponseData == None:
+            return
+        response = self.tbsResponseData.getComponentByName('responses').getComponentByPosition(0)
+        extensions = response.getComponentByName('singleExtensions')
+        ctoid = univ.ObjectIdentifier((1,3,6,1,4,1,11129,2,4,5))
+        if extensions == None:
+            print 'No implement certificate transparency'
+            return
+        for extension in extensions:
+            oid = extension.getComponentByPosition(0)
+            if oid == ctoid:
+                sct = str(extension.getComponentByPosition(2)).encode('hex')
+                print 'Signed Certificate Timestamp ' + sct
                 return
+        pass
 
-            ocspReq = self.make_ocsp_request(issuerCert,userCert)
 
-            httpReq = urllib2.Request(
-                self.ocsp_url,
-                encoder.encode(ocspReq),
-                { 'Content-Type': 'application/ocsp-request' }
-                )
-            httpRsp = urllib2.urlopen(httpReq).read()
-
-# Process OCSP response
-
-            ocspRsp, _ = decoder.decode(httpRsp, asn1Spec=rfc2560.OCSPResponse())
-
-            tbsResponse = self.get_ocsp_response(ocspRsp)
-            self.parse_ocsp_response(tbsResponse)
-
-        else:
-            pass
-
+    def check_ocsp(self):
+        if self.tbsResponseData == None:
+            return (None,None)
+        response = self.tbsResponseData.getComponentByName('responses').getComponentByPosition(0)
+        certStatus = response.getComponentByName('certStatus').getName()
+        certId = response.getComponentByName('certID').getComponentByName('serialNumber')
+        return (str(certStatus), certId)
 
     def make_ocsp_request(self,issuerCert, userCert):
         issuerTbsCertificate = issuerCert.getComponentByName('tbsCertificate')
@@ -136,38 +137,37 @@ class Ocsp:
         return ocspRequest
 
 
+    def get_ocsp_response(self):
+        if self.ocsp_url is not None:
+            try:
+                issuerCert, _ = decoder.decode(self.issuer_cert,asn1Spec=rfc2459.Certificate())
+                userCert, _ = decoder.decode(self.user_cert, asn1Spec=rfc2459.Certificate())
+            except:
+                return
 
-    def parse_ocsp_response(self,tbsResponse):
+            ocspReq = self.make_ocsp_request(issuerCert,userCert)
 
-        response = tbsResponse.getComponentByName('responses').getComponentByPosition(0)
-        producedAt = tbsResponse.getComponentByName('producedAt')
-        certId = response.getComponentByName('certID')
-        certStatus = response.getComponentByName('certStatus').getName()
-        nextUpdate = response.getComponentByName('nextUpdate')
+            httpReq = urllib2.Request(
+                self.ocsp_url,
+                encoder.encode(ocspReq),
+                { 'Content-Type': 'application/ocsp-request' }
+                )
+            httpRsp = urllib2.urlopen(httpReq).read()
 
-        producedAt = datetime.strptime(str(producedAt), '%Y%m%d%H%M%SZ')
-        nextUpdate = datetime.strptime(str(nextUpdate), '%Y%m%d%H%M%SZ')
+# Process OCSP response
 
-        print('Certificate ID %s is %s at %s till %s\n' % (
-            certId.getComponentByName('serialNumber'),
-            certStatus,
-            producedAt,
-            nextUpdate))
+            ocspRsp, _ = decoder.decode(httpRsp, asn1Spec=rfc2560.OCSPResponse())
 
+            responseStatus = ocspRsp.getComponentByName('responseStatus')
+            assert responseStatus == rfc2560.OCSPResponseStatus('successful'), responseStatus.prettyPrint()
+            responseBytes = ocspRsp.getComponentByName('responseBytes')
+            #responseType = responseBytes.getComponentByName('responseType')
+            #assert responseType == id_pkix_ocsp_basic, responseType.prettyPrint()
 
-    def get_ocsp_response(self, ocspResponse):
-        responseStatus = ocspResponse.getComponentByName('responseStatus')
-        assert responseStatus == rfc2560.OCSPResponseStatus('successful'), responseStatus.prettyPrint()
-        responseBytes = ocspResponse.getComponentByName('responseBytes')
-        #responseType = responseBytes.getComponentByName('responseType')
-        #assert responseType == id_pkix_ocsp_basic, responseType.prettyPrint()
+            response = responseBytes.getComponentByName('response')
 
-        response = responseBytes.getComponentByName('response')
+            basicOCSPResponse, _ = decoder.decode(
+                response, asn1Spec=rfc2560.BasicOCSPResponse()
+                )
 
-        basicOCSPResponse, _ = decoder.decode(
-            response, asn1Spec=rfc2560.BasicOCSPResponse()
-            )
-
-        tbsResponseData = basicOCSPResponse.getComponentByName('tbsResponseData')
-        return tbsResponseData
-
+            self.tbsResponseData = basicOCSPResponse.getComponentByName('tbsResponseData')

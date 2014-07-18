@@ -45,8 +45,7 @@ class TLSStream():
         """
         Method to extract certificate message from tls_record
         """
-        #TODO try to improved this a little bit and for some reason we are not extracting well the
-        #certificates
+        #TODO refactor this
         message = self._handshake_message.encode('hex')
         self._found = False
         try:
@@ -61,7 +60,7 @@ class TLSStream():
                             self.cert_message = message[next + 2:]
                     elif message[next:next + 2] == tls_types.TLS_H_TYPE_CERTIFICATE:
                         self._found = True
-                        self.cert_message = message[next + 2]
+                        self.cert_message = message[next + 2:]
                 elif message[10:12] == tls_types.TLS_H_TYPE_CERTIFICATE:
                     self._found = True
                     self.cert_message = message[12:]
@@ -81,7 +80,7 @@ class TLSStream():
                                 self.cert_message = message[next + 2:]
                         elif message[next:next + 2] == tls_types.TLS_H_TYPE_CERTIFICATE:
                             self._found = True
-                            self.cert_message = message[next + 2]
+                            self.cert_message = message[next + 2:]
                     elif message[10:12] == tls_types.TLS_H_TYPE_CERTIFICATE:
                         self._found = True
                         self.cert_message = message[12:]

@@ -30,12 +30,7 @@ def hexdump(buf, length=16):
 protocols = {socket.IPPROTO_TCP: 'tcp', socket.IPPROTO_UDP: 'udp', socket.IPPROTO_ICMP: 'icmp'}
 
 
-#In pkt we're gonna save all the packets to then reassembly it
-pkt = dict()
 
-#Basically here is a boolean for each "session" to determine when to process all the packetes
-#saved in pkt
-psh = dict()
 
 def decode_ip_packet(s):
     d = {
@@ -91,7 +86,7 @@ def is_server_hello_message(data):
         return False
 
 def is_alert_message(data):
-    if data[0:2] == tls_types.TLS_ALERT and data[2:6] == '0303':
+    if data[0:2] == tls_types.TLS_ALERT and (data[2:6] == '0303' or data[2:6] == '0301'):
         return True
     else:
         return False
@@ -143,39 +138,6 @@ def reassembler(tcp,ip):
 
     except:
             pass
-
-    #TODO improve this
-    #try:
-        #tupl = (src, dst, sport, dport)
-        #if flag == 18 or ((flag & 2) >> 1) == 1:
-
-            ##If flag == 18 means that flags SYNC and URG are activate new connection was established
-            ##(flag & 2) >> 1 is to see if the flag SYNC is presented
-            #pkt[tupl] = dict()  #In this dictionary we are gonna saved all the packets that match that tupl
-            #psh[tupl] = False #Indicate if we must process the packet
-
-        #elif flag == 11 or flag & 1 == 1:
-            ##SYNC/ACK/FIN or FIN was received
-            #process(pkt[tupl])
-            #del (pkt[tupl])
-            ##if we receive a 24 and before we received server hello don't care I am only interested in 24 after see a certificate
-        #elif flag == 24:
-            ##URG/ACK was received we must send to process because is data urgent so we can retrieve the TLS certificate in real time
-            #if tupl in pkt:
-                #pkt[tupl][str(tcp['seq'])] = data
-                #if psh[tupl] == True:
-                    #process(pkt[tupl])
-                    #del (pkt[tupl])
-                #elif psh[tupl] == False:
-                    #psh[tupl] = True
-        #else:
-            #if tupl in pkt:
-                #if psh[tupl] == True:
-                    #process(pkt[tupl])
-                    #del (pkt[tupl])
-                #pkt[tupl][str(tcp['seq'])] = data
-    #except KeyError:
-        #pass
 
 
 def process(tls_stream):
