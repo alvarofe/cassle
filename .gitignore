@@ -6,3 +6,5 @@ ssl/*.swp
 utils/*.swp
 dump
 log
+sslblacklist.csv
+prueba.py

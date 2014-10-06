@@ -11,11 +11,14 @@ import sys
 import pcap
 import argparse
 from utils.util import decode_packet
-# import nss.nss as nss
-#import signal
-# import os
+import threading
+import os
+
 
 # TODO add configuration file a clean code
+
+
+
 
 class sniff:
     def __init__(self):
@@ -50,6 +53,27 @@ class sniff:
             print '%d packets received, %d packets dropped, %d packets dropped by interface' % p.stats()
 
 
+def init_ssl_blacklist():
+    import wget
+    import csv
+    from db.database import  database
+    fingerprints = list()
+    file = wget.download('https://sslbl.abuse.ch/blacklist/sslblacklist.csv',out='/tmp',bar=None)
+    with open(file, 'rb') as csvfile:
+        reader  = csv.reader(csvfile, delimiter=' ', quotechar='|')
+        for row in reader:
+            try:
+                fingerprints.append(row[1].split(',')[1])
+            except:
+                pass
+    db = database("pfc", "blacklist")
+    db.set_black_list(fingerprints)
+    os.remove(file) 
+
+
+
 if __name__ == '__main__':
+    ssl_blacklist = threading.Thread(target=init_ssl_blacklist)
+    ssl_blacklist.start()
     s = sniff()
     s.sniff()

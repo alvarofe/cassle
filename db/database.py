@@ -18,6 +18,8 @@ cfg = Config(f).config
 f.close()
 #
 
+#TODO add support for sslblacklist
+
 class database:
 
         def __init__(self,db_name,collection):
@@ -75,6 +77,14 @@ class database:
                 return True
             else:
                 return False
+
+        def set_black_list(self,fingerprint_list):
+            for finger in fingerprint_list:
+                query = self.collection.find_one({"_id":finger})
+                if query is None:
+                    self.collection.insert({"_id":finger})
+
+
 
 
 if __name__ == '__main__':

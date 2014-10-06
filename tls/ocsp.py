@@ -70,15 +70,12 @@ class Ocsp:
         extensions = response.getComponentByName('singleExtensions')
         ctoid = univ.ObjectIdentifier((1,3,6,1,4,1,11129,2,4,5))
         if extensions == None:
-            print 'No implement certificate transparency'
-            return
+            return 'No implement certificate transparency'
         for extension in extensions:
             oid = extension.getComponentByPosition(0)
             if oid == ctoid:
                 sct = str(extension.getComponentByPosition(2)).encode('hex')
-                print 'Signed Certificate Timestamp ' + sct
-                return
-        pass
+                return 'Signed Certificate Timestamp ' + sct
 
 
     def check_ocsp(self):

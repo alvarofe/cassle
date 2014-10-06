@@ -10,7 +10,7 @@
 
 from tls import tls_types
 #import sys
-#from utils import util
+from utils.util import hexdump
 from tls.tls_verification import TLSVerificationDispatch
 
 #TODO try find another name for this class
@@ -45,7 +45,9 @@ class TLSStream():
         """
         Method to extract certificate message from tls_record
         """
-        #TODO refactor this
+
+        #TODO try to refactor here
+        
         message = self._handshake_message.encode('hex')
         self._found = False
         try:
@@ -84,10 +86,9 @@ class TLSStream():
                     elif message[10:12] == tls_types.TLS_H_TYPE_CERTIFICATE:
                         self._found = True
                         self.cert_message = message[12:]
-
-
         except:
             pass
+
 
     def _decode_certificate(self):
         if self._found == True:

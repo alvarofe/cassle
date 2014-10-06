@@ -9,7 +9,7 @@ from tls.auth_certificate import AuthCertificate
 import Queue
 import threading
 
-screen_lock =threading.Semaphore(value=1)
+screen_lock = threading.Lock()
 
 
 class TLSVerificationDispatch():
@@ -40,7 +40,7 @@ class TLSVerificationDispatch():
         else:
             pass
 
-    #TODO add everything to parse and use ocsp_stapling firefox support ocsp_stapling
+    #TODO add everything to parse and use ocsp_stapling firefox support ocsp_stapling. Our project won't add OCSP stapling support
     def verify_auth_ocsp_stapling(self):
         if self.ocsp_stapling is not None:
             #verify connection through ocsp_stapling
