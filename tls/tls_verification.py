@@ -1,9 +1,20 @@
-###############################################################################################
-### Name: ssl_verification.py
-### Author: Alvaro Felipe Melchor - alvaro.felipe91@gmail.com
-### Twitter : @alvaro_fe
-### University of Alcala de Henares
-###############################################################################################
+
+
+# Copyright (C) 2014       Alvaro Felipe Melchor (alvaro.felipe91@gmail.com)
+
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from tls.auth_certificate import AuthCertificate
 import Queue
@@ -18,7 +29,6 @@ class TLSVerificationDispatch():
 
         self.certificates = None
         self.ocsp_stapling = None
-
         if 'certificate' in data:
             self.certificates = data['certificate']
         if 'ocsp_stapling' in data:
@@ -31,7 +41,10 @@ class TLSVerificationDispatch():
         #Do everything related with certificate
         if self.certificates is not None:
             #verify certificate
+
+            # The queue will be use to return the result of the validation. With that note we will provide a answer if our connection is secure enough to continue navigating
             result_queue = Queue.Queue()
+            # The screen_lock will be shared for all the instance that is running 
             auth_cert_thread = AuthCertificate(self.certificates,result_queue, screen_lock)
             auth_cert_thread.daemon = True
             auth_cert_thread.start()
@@ -40,7 +53,8 @@ class TLSVerificationDispatch():
         else:
             pass
 
-    #TODO add everything to parse and use ocsp_stapling firefox support ocsp_stapling. Our project won't add OCSP stapling support
+    # Our project won't add OCSP stapling support because is not widely support. But like we did for certificate message 
+    # the same way would be for the OCSP stapling message in the handshake. Once we have it add all the logic necessary to validate it
     def verify_auth_ocsp_stapling(self):
         if self.ocsp_stapling is not None:
             #verify connection through ocsp_stapling

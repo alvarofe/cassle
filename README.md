@@ -31,9 +31,11 @@ Installation
   * Python binding for NSS - **$ pip install python-nss**
   * M2Crypto - **$ pip install M2Crypto**
   * pyasn1 - **$ pip install pyasn1**
-  * pync - Python Wrapper for Mac OS 10.8 Notification Center - **$ pip install pync**
+  * pync - Python Wrapper for Mac OS 10.8 Notification Center - **$ pip install pync** (This is only for Mac OS X)
   * Termcolor - **$ pip install termcolor**
-  * pymongo - **$ pip install pymongo**
+  * pymongo - **$ pip install pymongo** (we must have installed mongo in our computer before <http://www.mongodb.org/> )
+  * python-wget **$ pip install wget**
+  * config **$ pip install config**
 
 ---
 Once installed all packages: **./sniff.py -i < interface to sniff >**
@@ -41,5 +43,5 @@ Once installed all packages: **./sniff.py -i < interface to sniff >**
 
 State
 =====
-This project is under development and is possible that a lot of bugs exist in the code.
+This project is under development and is possible that it has a few bugs in the code.
 

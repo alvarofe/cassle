@@ -1,3 +1,23 @@
+
+
+# Copyright (C) 2014       Alvaro Felipe Melchor (alvaro.felipe91@gmail.com)
+
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+
+
 from  pyasn1.codec.der import decoder, encoder
 from pyasn1_modules import rfc2560, rfc2459
 from pyasn1.type import univ
@@ -41,7 +61,7 @@ class Ocsp:
         self._extract_ocsp_uri()
         self.valueOnlyBitStringEncoder = ValueOnlyBitStringEncoder()
         self.tbsResponseData = None
-        self.get_ocsp_response()
+        
 
     def _extract_ocsp_uri(self):
         cert = M2Crypto.X509.load_cert_string(self.user_cert,FORMAT_DER)
@@ -79,6 +99,7 @@ class Ocsp:
 
 
     def check_ocsp(self):
+        self.get_ocsp_response()
         if self.tbsResponseData == None:
             return (None,None)
         response = self.tbsResponseData.getComponentByName('responses').getComponentByPosition(0)

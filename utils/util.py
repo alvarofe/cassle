@@ -1,9 +1,21 @@
-###############################################################################################
-### Name: util.py
-### Author: Alvaro Felipe Melchor - alvaro.felipe91@gmail.com
-### Twitter : @alvaro_fe
-### University of Alcala de Henares
-###############################################################################################
+
+
+# Copyright (C) 2014       Alvaro Felipe Melchor (alvaro.felipe91@gmail.com)
+
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 
 import struct
 import socket
@@ -28,7 +40,6 @@ def hexdump(buf, length=16):
         n += length
     return '\n'.join(res)
 
-protocols = {socket.IPPROTO_TCP: 'tcp', socket.IPPROTO_UDP: 'udp', socket.IPPROTO_ICMP: 'icmp'}
 def decode_packet(pktlen, datos, timestamp):
     if not datos:
         return
@@ -36,7 +47,24 @@ def decode_packet(pktlen, datos, timestamp):
         packet = datos[14:]
         ip_header = packet[0:20]
      
-        #now unpack them :)
+        """
+        The ip_headers looks like 
+
+        typedef struct header
+        {
+        //IP-Header
+            unsigned char ip_v:4, ip_hl:4;/* this means that each member is 4 bits */
+            unsigned char ip_tos;       //1 Byte
+            unsigned short int ip_len;  //2 Byte
+            unsigned short int ip_id;   //2 Byte
+            unsigned short int ip_off;  //2 Byte
+            unsigned char ip_ttl;       //1 Byte
+            unsigned char ip_p;         //1 Byte
+            unsigned short int ip_sum;  //2 Byte
+            unsigned int ip_src;        //4 Byte
+            unsigned int ip_dst;        //4 Byte
+        }   
+        """
         iph = struct.unpack('!BBHHHBBH4s4s' , ip_header)
         version_ihl = iph[0]
         version = version_ihl >> 4
@@ -51,7 +79,22 @@ def decode_packet(pktlen, datos, timestamp):
 
         tcp_header = packet[iph_length:iph_length+20]
          
-        #now unpack them :)
+        """
+        TCP headers looks like
+
+        typedef struct {
+              uint16_t src_port;
+              uint16_t dst_port;
+              uint32_t seq;
+              uint32_t ack;
+              uint8_t  data_offset;  // 4 bits
+              uint8_t  flags;
+              uint16_t window_size;
+              uint16_t checksum;
+              uint16_t urgent_p;
+        } tcp_header_t;
+        """
+
         tcph = struct.unpack('!HHLLBBHHH' , tcp_header)
         source_port = tcph[0]
         dest_port = tcph[1]
@@ -69,6 +112,8 @@ def decode_packet(pktlen, datos, timestamp):
         #get data from the packet
         data = packet[h_size:]
         assembler(data.encode('hex'), s_addr, d_addr, source_port, dest_port,flag, str(sequence))
+
+
 def is_server_hello_message(data):
     if data[0:2] == tls_types.TLS_HANDSHAKE and data[10:12] == tls_types.TLS_H_TYPE_SERVER_HELLO:
         return True
@@ -84,6 +129,19 @@ def is_alert_message(data):
 metadata = dict()
 
 def assembler(data,s_addr, d_addr, source_port, dest_port, flag, sequence):
+    """
+    Function that assembles all the packets to produce a stream of tls. But we start to assembles it when serverHello o alertMessage is seen
+
+    Parameters:
+        -data : The TCP data encode in hex. This is because then is more easy manipulate the data
+        -s_addr : The src IP 
+        -d_addr : The dst IP 
+        -source_port : The src port
+        -dest_port : The dest port
+        -flag: The TCP flag of our tcp packet
+        -sequence: The seq of our tcp packet
+    """
+
     global metadata
     src = str(s_addr)
     dst = str(d_addr)
@@ -103,11 +161,13 @@ def assembler(data,s_addr, d_addr, source_port, dest_port, flag, sequence):
         if recollect == True:
             metadata[id]['data'][sequence] = data.decode('hex')
         elif is_server_hello_message(data) or is_alert_message(data):
-            #We start collect data
+            # We start collect data when a new connection is seen. Usually all the connection start with Server Hello message. 
+            # I put also Alert Message bacause some certificates come after this message. I saw this through wireshark
             metadata[id] = dict()
             metadata[id]['data'] = dict()
-            metadata[id]['recollect'] = True
-            metadata[id]['psh-ack'] = 0
+            metadata[id]['recollect'] = True # That True says that with that id we can put data in it
+            metadata[id]['psh-ack'] = 0 # The psh-ack is used as a flag to terminate the recollecting of data. After two psh-ack we already have the certificate message 
+                                        # so we don't need to recollect more data
             metadata[id]['data'][sequence] = data.decode('hex')
     if flag == 24:
         #24 means PSH-ACK
@@ -119,25 +179,17 @@ def assembler(data,s_addr, d_addr, source_port, dest_port, flag, sequence):
                 #Second PSH-ACK received
                 metadata[id]['data'][sequence] = data.decode('hex')
                 stream = metadata[id]['data']
-                # print stream
-                from tls.tls_stream import TLSStream
-                TLSStream(stream)
+                process_stream(stream)
                 del (metadata[id])
-                # process_stream(id)
-                       
-
-    
 
 
-def process_stream(id):
+def process_stream(tls_stream):
     #To break import loop
-    tls_stream = metadata[id]['data']
-    del (metadata[id])
-    # from tls.tls_stream import TLSStream
-    # TLSStream(tls_stream)
-    aux = str()
-    for key in sorted(tls_stream):
-        aux += tls_stream[key]
-    print hexdump(aux)
+    from tls.tls_stream import TLSStream
+    TLSStream(tls_stream)
+    # aux = str()
+    # for key in sorted(tls_stream):
+    #     aux += tls_stream[key]
+    # print hexdump(aux)
 
 

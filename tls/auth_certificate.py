@@ -1,10 +1,19 @@
-###############################################################################################
-### Name: auth_certificate.py
-### Author: Alvaro Felipe Melchor - alvaro.felipe91@gmail.com
-### Twitter : @alvaro_fe
-### University of Alcala de Henares
-###############################################################################################
 
+
+# Copyright (C) 2014       Alvaro Felipe Melchor (alvaro.felipe91@gmail.com)
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 #Here all related with the verification through certficate
@@ -18,7 +27,6 @@ import threading
 import nss.nss as nss
 import os
 import platform
-from pync import Notifier
 from termcolor import colored
 from db.database import database
 from tls.ocsp import Ocsp
@@ -37,7 +45,7 @@ from config import Config
 f = file('config/config.cfg')
 cfg = Config(f)
 f.close()
-#
+#zx
 
 
 intended_usage = nss.certificateUsageSSLServer
@@ -56,9 +64,10 @@ logging.basicConfig(filename=logPath,format='%(asctime)s --  %(levelname)s:%(mes
 
 
 system = platform.system()
+if system == "Darwin":
+    from pync import Notifier
 
-#TODO # add configuration and log and sendemail when a mitm happened
-# TODO I am having some issues to gather certificate some are missed
+#TODO # add configuration and log and sendemail when a mitm happens
 
 class AuthCertificate(threading.Thread):
     """
@@ -66,6 +75,14 @@ class AuthCertificate(threading.Thread):
     """
 
     def __init__(self, certificates,queue, screen_lock):
+        """
+        Constructor of AuthCertificate
+
+        Parameters:
+            -certificates: The certificate chain
+            -queue: Here we will return the result of our verification
+            -screen_lock: Lock used to print in the screen
+        """
 
         #The queue is used to return data to the main thread
         threading.Thread.__init__(self)
@@ -84,7 +101,7 @@ class AuthCertificate(threading.Thread):
             try:
                 self.cert_nss.append(nss.Certificate(self.certs[i],self.certdb))
             except:
-                print 'Exception here'
+                # print 'Exception here'
                 break
 
         try:
@@ -94,37 +111,46 @@ class AuthCertificate(threading.Thread):
 
         db_name = cfg.db.db_name
         self.db_pin = database(db_name, cfg.db.coll_name_pinning)
-        self.db_rfc = database(db_name, cfg.db.coll_name_log)
-        self.db_blacklist = database(db_name, "blacklist")
+        self.db_log = database(db_name, cfg.db.coll_name_log)
+        self.db_blacklist = database(db_name, cfg.db.coll_name_blacklist)
 
 
     def run(self):
-        #TODO add here execution based on the configuration file
         if len(self.cert_nss) == 1:
             cad =  'We need more information to validate the cerfificate --> ' + self.cert_nss[0].make_ca_nickname()
             with self.lock:
                 print colored(cad,'red')
             return
-        self.verify_cert_through_rfc()
-        self.verify_dnssec_tlsa()
-        self.verify_cert_with_pinning()
-        self.verify_cert_with_icsy_notary()
-        self.verify_ocsp()
-        self.verify_ct()
-        self.verify_ssl_blacklist()
+        validation = cfg.validation
+
+        if validation.rfc == True:
+            self.verify_cert_through_rfc()
+        if validation.dnssec == True:
+            self.verify_dnssec_tlsa()
+        if validation.pinning == True:
+            self.verify_cert_with_pinning()
+        if validation.icsi == True:
+            self.verify_cert_with_icsi_notary()
+        if validation.ocsp == True:
+            self.verify_ocsp()
+        if validation.ct == True:
+            self.verify_ct()
+        if validation.blacklist == True:
+            self.verify_ssl_blacklist()
 
 
     def verify_ssl_blacklist(self):
+        name = self.cert_nss[0].make_ca_nickname()
         s = hashlib.new("sha1")
         s.update(self.certs[0])
         fingerprint = s.hexdigest()
         query = self.db_blacklist.get(fingerprint)
         if query == None:
             with self.lock:
-                print 'You are safe againts SSL-BLACKLIST database'
+                print 'The certificate %s is  safe against SSL-BLACKLIST database' % (name)
         else:
             with self.lock:
-                print 'You are using a Certificate that match with malware-certificate'
+                print 'You connected a site that uses a Certificate (%s) that match with malware-certificate' % (name)
         pass
 
     """
@@ -152,44 +178,74 @@ class AuthCertificate(threading.Thread):
     def verify_dnssec_tlsa(self):
         import dns.resolver
         import hashlib
+
+        def verify(url):
+            try:
+                #print '_443._tcp. + url
+                answer = dns.resolver.query('_443._tcp.' + url, 'TLSA')
+                answer = [str(ans) for ans in answer][0].split(' ')
+                hash_tlsa = answer[len(answer) - 1]
+                s = hashlib.new('sha256')
+                s.update(self.certs[0])
+                res = s.hexdigest()
+                if res == hash_tlsa:
+                    return True
+                else:
+                    return False
+            except:
+                return False
+                # pass
+
         try:
             url = self.cert_nss[0].subject_common_name
         except IndexError:
             return
-        if url[0] == '*':
-            url = url.replace('*', 'www')
-        try:
-            #print '_443._tcp. + url
-            answer = dns.resolver.query('_443._tcp.' + url, 'TLSA')
-            answer = [str(ans) for ans in answer][0].split(' ')
-            hash_tlsa = answer[len(answer) - 1]
-            s = hashlib.new('sha256')
-            s.update(self.certs[0])
-            res = s.hexdigest()
-            if res == hash_tlsa:
-                with self.lock:
-                    print colored('The certificate with id %s is safe through DANE' % self.cert_nss[0].serial_number, 'magenta')
-            else:
-                with self.lock:
-                    print colored('The certificate with id %s does not implement DANE' % self.cert_nss[0].serial_number, 'white')
-        except:
-            pass
 
+
+        # Here I test different url because some site maybe implements dnssec without the wwww for example.
+        # the site https://hacklab.to/ when you see its certificate the subject_common_name is www.hacklab.to
+        # but the dnssec only respond when you ask for hacklab.to. So I have to test with different url to asure
+        # all the posibilities and provide better solution.
+
+        # Site where you can test this verification
+        #   - https://www.huque.com/  -> Valid TLSA Record
+        #   - https://hacklab.to/  -> Not Valid TLSA Record
+
+        result = False
+        cert = self.cert_nss[0]
+        result = verify(url)
+
+        if result == True:
+            with self.lock:
+                print colored('The certificate %s with id %s has a valid TLSA record' % (cert.make_ca_nickname(), cert.serial_number), 'magenta')
+            return 
+        if url[0:3] == "www":
+            url = url.replace("www.",'')
+            result = verify(url)
+        elif url[0] == '*':
+            url = url.replace('*', 'www')
+            result = verify(url)
+        if result == True:
+                with self.lock:
+                    print colored('The certificate %s with id %s has a valid TLSA record' % (cert.make_ca_nickname(), cert.serial_number), 'magenta')
+                return 
+        with self.lock:
+            print colored('The certificate %s with id %s has not a valid TLSA record or not implement DANE/DNSSEC' % (cert.make_ca_nickname(), cert.serial_number), 'white')
 
     def verify_ocsp(self):
         status, certId = self.ocsp.check_ocsp()
+        name = self.cert_nss[0].make_ca_nickname()
         if status == None:
             with self.lock:
-                print colored('The certificate with id  %s does not have OCSP URI' % self.cert_nss[0].serial_number,'white')
+                print colored('The certificate %s with id  %s does not have OCSP URI' % (name, certId),'white')
             return
         if status == 'revoked':
             self._notify_mitm(title='OCSP-MITM')
             with self.lock:
-                print colored('This certificate with id  %s is revoked' % certId,'red')
+                print colored('This certificate %s with id  %s is revoked' % (name, certId),'red')
         else:
             with self.lock:
-                print colored('This certificate with id %s is not revoked' % certId,'cyan')
-
+                print colored('This certificate %s with id %s is not revoked' % (name, certId),'cyan')
 
     def verify_cert_through_rfc(self):
             """
@@ -197,7 +253,7 @@ class AuthCertificate(threading.Thread):
             """
             approved_usage = not intended_usage
             try:
-                # Turns on OCSP checking for the given certificate database. But only in the database not in the actual certificate of our site
+                # Turns on OCSP checking for the given certificate database.
                 nss.enable_ocsp_checking(self.certdb)
                 cert = self.cert_nss[0]
                 ca_name = cert.make_ca_nickname()
@@ -273,7 +329,7 @@ class AuthCertificate(threading.Thread):
             pass
 
 
-    def verify_cert_with_icsy_notary(self):
+    def verify_cert_with_icsi_notary(self):
         import dns
         from dns import resolver
         cert = self.cert_nss[0]
@@ -283,7 +339,9 @@ class AuthCertificate(threading.Thread):
         try:
             result =  resolver.query(address,rdtype=dns.rdatatype.TXT)[0].__str__().split()
         except:
-            #icsy_notary doesn't have that certificate
+            #icsi_notary doesn't have that certificate
+            with self.lock:
+                print "icsi notary does not have that certificate"
             return
         validated = int(result[4].split('=')[1][0])
         first_seen = int(result[1].split('=')[1])
@@ -295,10 +353,12 @@ class AuthCertificate(threading.Thread):
                 print colored(cad,'red')
         else:
             s = last_seen - first_seen  + 1
-            if s - times_seen > 1:
+            if s - times_seen >= cfg.icsi.maximum_interval:
                 cad = "This certificate %s is not ENOUGH secure according to icsi_notary" % (cert.make_ca_nickname())
+                self._notify_mitm(title='ICSI-MITM')
                 with self.lock:
                     print colored(cad,'red')
+                    
             else:
                 cad = "This certificate %s IS SECURE through icsi_notary" % (cert.make_ca_nickname())
                 with self.lock:
@@ -308,9 +368,9 @@ class AuthCertificate(threading.Thread):
     def _log_fail(self):
             cn_cert = self.cert_nss[0]
             name = cn_cert.make_ca_nickname()
-            exist = self.db_rfc.get(name)
+            exist = self.db_log.get(name)
             if exist is None:
-                self.db_rfc.set_rfc(cn_cert.make_ca_nickname())
+                self.db_log.set_rfc(cn_cert.make_ca_nickname())
                 # print cn_cert
                 logging.info("You don't trust in this certificate when you connected to %s \n %s",
                                 name, cn_cert)
@@ -321,10 +381,9 @@ class AuthCertificate(threading.Thread):
         else:
             pass
 
-    def _add_certiticate_to_nssdb(self,cert,name=None,trust=False):
+    def _add_certiticate_to_nssdb(self,cert,name=None):
         """
         This function add intermediate certificate to NSS-DB only to verify. We don't trust on it
-        If you want to trust in it, only set trust param to True
         """
 
         if not os.path.exists(os.getcwd() +'/tmp'):
@@ -337,10 +396,7 @@ class AuthCertificate(threading.Thread):
                 return
             tmp.flush
             tmp.seek(0)
-            if not trust:
-                subprocess.call(["certutil", "-A","-n",name,'-t',',,,','-a','-i',tmp.name,'-d',self.certdb_dir])
-            else:
-                subprocess.call(["certutil", "-A","-n",name,'-t','C,,,','-a','-i',tmp.name,'-d',self.certdb_dir])
+            subprocess.call(["certutil", "-A","-n",name,'-t',',,,','-a','-i',tmp.name,'-d',self.certdb_dir])
         return
 
 

@@ -1,10 +1,20 @@
-###############################################################################################
-### Name: ssl_stream.py
-### Author: Alvaro Felipe Melchor - alvaro.felipe91@gmail.com
-### Twitter : @alvaro_fe
-### University of Alcala de Henares
-###############################################################################################
 
+
+# Copyright (C) 2014       Alvaro Felipe Melchor (alvaro.felipe91@gmail.com)
+
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #This gonna be a class that we'll be initialized with raw data. self.messages will contain all the tls message related with handshake
 
@@ -33,8 +43,12 @@ class TLSStream():
 
     def _process_tcp_stream(self, raw_data):
         """
-        Method that assemblies tcp streams to process it latter
+        Method that assemblies tcp streams to process it latter. 
         """
+
+        # raw_data in reality is the stream that we collected in the function assembler in util.py
+        # how we saved the data in a dictionary with the seq number we only have to order the seq number
+        # and split each packet.
         aux = raw_data
         self._handshake_message = str()
         #Sorted because we must ordered in function of the number of sequence
@@ -47,6 +61,9 @@ class TLSStream():
         """
 
         #TODO try to refactor here
+
+        # To understand better this use wireshark to disseminate each message and see
+        # each structure
         
         message = self._handshake_message.encode('hex')
         self._found = False
@@ -87,7 +104,8 @@ class TLSStream():
                         self._found = True
                         self.cert_message = message[12:]
         except:
-            pass
+            print 'error in _decode_tls_record in tls_stream'
+            # pass
 
 
     def _decode_certificate(self):
