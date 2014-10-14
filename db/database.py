@@ -22,26 +22,21 @@
 # store everything related with pinning stuff
 
 from pymongo import MongoClient
-from config import Config
-
-#Configuration stuff
-f = file('config/config.cfg')
-cfg = Config(f).config
-f.close()
-#
-
 
 class database:
 
         def __init__(self,db_name,collection):
             """
             Constructor of this class
-            
-            Parameters: 
-                -db_name: The database name 
-                -collection: The collection inside our database  
+            Parameters:
+                -db_name: The database name
+                -collection: The collection inside our database
+
+            Comment: Change the localhost and 27017 if you want change the location of database
             """
-            connection = MongoClient(cfg.URL_DB,cfg.PORT_DB)
+            self._db_name = db_name
+            self._collection = collection
+            connection = MongoClient("localhost",27017)
             self.db = connection[db_name]
             self.collection = self.db[collection]
 
@@ -88,7 +83,7 @@ class database:
                 return False
 
 
-        def set_pin(self,hash_t,canickname):
+        def set_pin(self,hash_t,canickname,drop=True):
             """
             Method to set a pin for a ca_nickname. Given a canickname we save in the database the pin
 
@@ -98,7 +93,8 @@ class database:
             """
             data = {
                     "_id" :  canickname,
-                    "hash" : hash_t
+                    "hash" : hash_t,
+                    "drop" : drop
                     }
             # but first to insert it is a good practice to see if exists other element with
             # the same id
@@ -124,6 +120,14 @@ class database:
                 query = self.get(finger)
                 if query is None:
                     self.collection.insert({"_id":finger})
+
+
+        def drop_pinning(self):
+            if self._collection == "pinning":
+                self.collection.remove({"drop" : True})
+            else:
+                return
+
 
 
 

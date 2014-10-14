@@ -48,7 +48,7 @@ class TLSStream():
 
         # raw_data in reality is the stream that we collected in the function assembler in util.py
         # how we saved the data in a dictionary with the seq number we only have to order the seq number
-        # and split each packet.
+        # and join each packet.
         aux = raw_data
         self._handshake_message = str()
         #Sorted because we must ordered in function of the number of sequence

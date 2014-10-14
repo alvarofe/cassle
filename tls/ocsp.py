@@ -114,9 +114,9 @@ class Ocsp:
         userTbsCertificate = userCert.getComponentByName('tbsCertificate')
         userIssuer = userTbsCertificate.getComponentByName('issuer')
 
-        assert issuerSubject == userIssuer, '%s\n%s' % (
-            issuerSubject.prettyPrint(), userIssuer.prettyPrint()
-            )
+        # assert issuerSubject == userIssuer, '%s\n%s' % (
+        #     issuerSubject.prettyPrint(), userIssuer.prettyPrint()
+        #     )
 
         userIssuerHash = hashlib.sha1(
             encoder.encode(userIssuer)

@@ -18,20 +18,77 @@
 
 
 import optparse
-from db import database
+import os
+import nss.nss as nss
+from config import Config
+import M2Crypto.X509 
+from M2Crypto.X509 import FORMAT_DER, FORMAT_PEM
+import hashlib
+import sha3
+from Crypto.Util.asn1 import DerSequence
+import subprocess
+import sys
+sys.path.append('../db')
+from database import database
 
 
+f = file('../config/config.cfg')
+cfg = Config(f)
+f.close()
 
 if __name__ == '__main__':
-    parser = optparse.OptionParser("usage: %prog -p <hash_pin> -c <ca_nickname> -c <collection_name> -d <database_name>")
-    parser.add_option('-p','--pin', dest='pin',help = "Hash that pin a certificate")
-    parser.add_option('-n', '--ca_nickname', dest='ca_name', help = "CA name for the hash (Attention - CA name should match the exact name that offers nss)")
-    parser.add_option('-c', '--collection', dest='collection',help = "Collection name for the database")
-    parser.add_option('-d', '--db_name', dest='db_name', help = "Database name")
+    parser = optparse.OptionParser("usage: %prog -f <folder with certificates> ")
+    parser.add_option('-f','--folder', dest='folder',help = "Directory that holds certificates")
+
 
     (opts, args) = parser.parse_args()
-    if len(args) != 4:
-        parser.error("Incorrect number of arguments")
+    if opts.folder == None:
+        parser.error("Specify the name of directory")
 
-    db = database(opts.db_name, opts.collection)
-    db.set_pin(opts.pin, opts.ca_name)
+    path = os.path.expanduser(opts.folder)
+
+    certdb_dir = os.path.expanduser(cfg.config.NSS_DB_DIR)
+    nss.nss_init(certdb_dir)
+    certdb = nss.get_default_certdb()
+    db = database("pfc", "pinning")
+
+
+    for i in os.listdir(path):
+        file = os.path.join(path,i)
+        if os.path.isfile(file):
+            #f = open(file).readlines()
+            #f =  ''.join(f)
+            try:
+                a = M2Crypto.X509.load_cert(file,format=FORMAT_DER)
+            except:
+                cmdstr = ["openssl", "x509","-in",file, "-inform","PEM","-out",file, "-outform","DER"]
+                subprocess.call(cmdstr)
+                a = M2Crypto.X509.load_cert(file,format=FORMAT_DER)
+
+            der = a.as_der()
+            cert = nss.Certificate(der,certdb)
+
+            s = hashlib.new("sha3_512")
+            cert_dec = DerSequence()
+            cert_dec.decode(der)
+            tbsCertificate = DerSequence()
+            try:
+                tbsCertificate.decode(cert_dec[0])
+            except:
+                continue
+            try:
+                spki = tbsCertificate[6]
+            except:
+                #FIXME observing some outcomes with the certificates given the len(tbs)-1 is spki
+                #I don't know why due to spki in the rfc is in the 7th position. BTW maybe you have to 
+                #research in this and adapt it based in yours certificates. Also you can develop your own script
+                #but is important to use nss because the main program use serial + make_ca_nickname 
+                spki = tbsCertificate[len(tbsCertificate)-1]
+            s.update(spki)
+            hash_t = s.hexdigest()
+            serial = cert.serial_number
+            _id = str(serial) + ' - ' + cert.make_ca_nickname()
+            exist = db.get(_id)
+            if exist == None:
+                db.set_pin(hash_t,_id,drop=False)
+

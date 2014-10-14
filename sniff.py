@@ -26,13 +26,20 @@ import threading
 import os
 from config import Config
 import subprocess
+from db.database import database
+from apscheduler.schedulers.background import BackgroundScheduler
 
 
 
 f = file('config/config.cfg')
 cfg = Config(f).db
 f.close()
+scheduler = BackgroundScheduler()
 
+
+def drop():
+    db = database("pfc", "pinning")
+    db.drop_pinning()
 
 class sniff:
     def __init__(self):
@@ -48,6 +55,7 @@ class sniff:
         self.interface = options.interface
 
     def sniff(self):
+        global scheduler
         p = pcap.pcapObject()
         dev = self.interface
         net, mask = pcap.lookupnet(dev)
@@ -57,6 +65,7 @@ class sniff:
             while 1:
                 p.dispatch(1, decode_packet)
         except KeyboardInterrupt:
+            scheduler.shutdown()
             print '%s' % sys.exc_type
             print 'shutting down'
             print '%d packets received, %d packets dropped, %d packets dropped by interface' % p.stats()
@@ -78,13 +87,19 @@ def init_ssl_blacklist():
                 fingerprints.append(row[1].split(',')[1])
             except:
                 pass
-    db = database(cfg.db_name, cfg.coll_name_blacklist)
+    db = database(cfg.db_name, "blacklist")
     db.set_black_list(fingerprints)
     os.remove(file) 
 
 
 
 if __name__ == '__main__':
+    # This is to delete the pinning database each day to avoid that an evil site perform MITM attacks over our connections
+    # That's why because in our code we save the pinning each time that we visite a site. But if this site is evil we are saving bad pinning 
+    # so we have to delete the database to ensure that evil site has been deleted. You can change the seconds.
+    scheduler.add_job(drop, 'interval', seconds=cfg.time_remove)
+    scheduler.start()
+
     print '***** launching mongo daemon *****'
     devnull = open('/dev/null', 'w')
     try:
@@ -92,7 +107,10 @@ if __name__ == '__main__':
     except:
         pass
     print '***** launched mongo daemon *****'
+
+
     ssl_blacklist = threading.Thread(target=init_ssl_blacklist)
     ssl_blacklist.start()
+    
     s = sniff()
     s.sniff()

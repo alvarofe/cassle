@@ -32,8 +32,8 @@ from db.database import database
 from tls.ocsp import Ocsp
 import subprocess, tempfile
 from nss.error import NSPRError
-from  pyasn1.codec.der import decoder, encoder
-from pyasn1_modules import rfc2560, rfc2459
+from  pyasn1.codec.der import decoder
+from pyasn1_modules import  rfc2459
 from pyasn1.type import univ
 import hashlib
 #TODO add verification based in the configuration file
@@ -45,7 +45,7 @@ from config import Config
 f = file('config/config.cfg')
 cfg = Config(f)
 f.close()
-#zx
+#
 
 
 intended_usage = nss.certificateUsageSSLServer
@@ -110,9 +110,9 @@ class AuthCertificate(threading.Thread):
             pass
 
         db_name = cfg.db.db_name
-        self.db_pin = database(db_name, cfg.db.coll_name_pinning)
-        self.db_log = database(db_name, cfg.db.coll_name_log)
-        self.db_blacklist = database(db_name, cfg.db.coll_name_blacklist)
+        self.db_pin = database(db_name, "pinning")
+        self.db_log = database(db_name, "log")
+        self.db_blacklist = database(db_name, "blacklist")
 
 
     def run(self):
@@ -153,9 +153,7 @@ class AuthCertificate(threading.Thread):
                 print 'You connected a site that uses a Certificate (%s) that match with malware-certificate' % (name)
         pass
 
-    """
-    Methods that implement verification using the certificate
-    """
+
     def verify_ct(self):
         #self.ocsp.check_certificate_transparency()
         cert, _ = decoder.decode(self.certs[0],asn1Spec=rfc2459.Certificate())
@@ -167,6 +165,7 @@ class AuthCertificate(threading.Thread):
                 sct =  str(ext.getComponentByPosition(2)).encode('hex')
         if sct != None:
             with self.lock:
+                print self.cert_nss[0].make_ca_nickname()
                 print 'Signed Certificate Timestamp found ' + sct
         else:
             s = self.ocsp.check_certificate_transparency()
@@ -204,7 +203,7 @@ class AuthCertificate(threading.Thread):
 
         # Here I test different url because some site maybe implements dnssec without the wwww for example.
         # the site https://hacklab.to/ when you see its certificate the subject_common_name is www.hacklab.to
-        # but the dnssec only respond when you ask for hacklab.to. So I have to test with different url to asure
+        # but the dnssec only respond when you ask for hacklab.to. So I have to test with different url to ensure
         # all the posibilities and provide better solution.
 
         # Site where you can test this verification
@@ -288,10 +287,9 @@ class AuthCertificate(threading.Thread):
         from Crypto.Util.asn1 import DerSequence
         import sha3
         s = hashlib.new("sha3_512")
-        #TODO change the _id in the database should be only a string
         try:
             # We extract SubjectPublicKeyInfo. Why? Because everybody say that is the best part of the certificate
-            #to do that
+            #to do that. If you want more information about it search it in Google
 
             der = self.certs[0]
             cert_dec = DerSequence()
@@ -306,6 +304,8 @@ class AuthCertificate(threading.Thread):
             serial = cert.serial_number
             _id = str(serial) + ' - ' + cert.make_ca_nickname()
             exist = self.db_pin.get(_id)
+            with self.lock:
+                print hash_t
             if exist == None:
                 # That means that the certificate is not in the database, it's the first time it was seen
                 self.db_pin.set_pin(hash_t, _id)
@@ -358,7 +358,6 @@ class AuthCertificate(threading.Thread):
                 self._notify_mitm(title='ICSI-MITM')
                 with self.lock:
                     print colored(cad,'red')
-                    
             else:
                 cad = "This certificate %s IS SECURE through icsi_notary" % (cert.make_ca_nickname())
                 with self.lock:
