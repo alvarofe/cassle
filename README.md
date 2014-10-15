@@ -24,7 +24,6 @@ A continuation the list of different techniques that the project is using:
 Installation
 ============
 
--
 
 #### Prerequisites
  
