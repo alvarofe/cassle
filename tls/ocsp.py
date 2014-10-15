@@ -176,8 +176,8 @@ class Ocsp:
 
             ocspRsp, _ = decoder.decode(httpRsp, asn1Spec=rfc2560.OCSPResponse())
 
-            responseStatus = ocspRsp.getComponentByName('responseStatus')
-            assert responseStatus == rfc2560.OCSPResponseStatus('successful'), responseStatus.prettyPrint()
+            #responseStatus = ocspRsp.getComponentByName('responseStatus')
+            #assert responseStatus == rfc2560.OCSPResponseStatus('successful'), responseStatus.prettyPrint()
             responseBytes = ocspRsp.getComponentByName('responseBytes')
             #responseType = responseBytes.getComponentByName('responseType')
             #assert responseType == id_pkix_ocsp_basic, responseType.prettyPrint()

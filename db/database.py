@@ -123,6 +123,9 @@ class database:
 
 
         def drop_pinning(self):
+            """
+            Remove all the pinning whose property drop is set to True
+            """
             if self._collection == "pinning":
                 self.collection.remove({"drop" : True})
             else:

@@ -21,8 +21,8 @@ import optparse
 import os
 import nss.nss as nss
 from config import Config
-import M2Crypto.X509 
-from M2Crypto.X509 import FORMAT_DER, FORMAT_PEM
+import M2Crypto.X509
+from M2Crypto.X509 import FORMAT_DER
 import hashlib
 import sha3
 from Crypto.Util.asn1 import DerSequence
@@ -32,7 +32,7 @@ sys.path.append('../db')
 from database import database
 
 
-f = file('../config/config.cfg')
+f = open('../config/config.cfg')
 cfg = Config(f)
 f.close()
 
@@ -61,6 +61,7 @@ if __name__ == '__main__':
             try:
                 a = M2Crypto.X509.load_cert(file,format=FORMAT_DER)
             except:
+                #we should transform PEM encoding to DER
                 cmdstr = ["openssl", "x509","-in",file, "-inform","PEM","-out",file, "-outform","DER"]
                 subprocess.call(cmdstr)
                 a = M2Crypto.X509.load_cert(file,format=FORMAT_DER)

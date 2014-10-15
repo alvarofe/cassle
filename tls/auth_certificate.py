@@ -36,13 +36,14 @@ from  pyasn1.codec.der import decoder
 from pyasn1_modules import  rfc2459
 from pyasn1.type import univ
 import hashlib
-#TODO add verification based in the configuration file
+from ct.proto import client_pb2
+
 
 
 from config import Config
 
 #Configuration stuff
-f = file('config/config.cfg')
+f = open('config/config.cfg')
 cfg = Config(f)
 f.close()
 #
@@ -67,7 +68,7 @@ system = platform.system()
 if system == "Darwin":
     from pync import Notifier
 
-#TODO # add configuration and log and sendemail when a mitm happens
+#TODO # add configuration and log and sendemail when a mitm happened
 
 class AuthCertificate(threading.Thread):
     """
@@ -84,7 +85,6 @@ class AuthCertificate(threading.Thread):
             -screen_lock: Lock used to print in the screen
         """
 
-        #The queue is used to return data to the main thread
         threading.Thread.__init__(self)
         self.lock = screen_lock
         self.queue = queue
@@ -117,11 +117,14 @@ class AuthCertificate(threading.Thread):
 
     def run(self):
         if len(self.cert_nss) == 1:
-            cad =  'We need more information to validate the cerfificate --> ' + self.cert_nss[0].make_ca_nickname()
+            #Could be this an attack??
+            cad =  'We need all the chain to validate --> ' + self.cert_nss[0].make_ca_nickname()
             with self.lock:
                 print colored(cad,'red')
             return
         validation = cfg.validation
+
+        #based on our configuration file we applie different methods to use
 
         if validation.rfc == True:
             self.verify_cert_through_rfc()
@@ -140,6 +143,10 @@ class AuthCertificate(threading.Thread):
 
 
     def verify_ssl_blacklist(self):
+        """
+        We take our der-certificate and compare the fingerprint against the sslblacklist to ensure
+        that we are not connected to malware site
+        """
         name = self.cert_nss[0].make_ca_nickname()
         s = hashlib.new("sha1")
         s.update(self.certs[0])
@@ -155,6 +162,22 @@ class AuthCertificate(threading.Thread):
 
 
     def verify_ct(self):
+	"""
+	Certificate Transparency Log
+
+        If we read in the RFC.
+
+        <whe should validate the SCT by computing the signature input from the SCT data as well as the
+        certificate and verifying the signature, using the corresponding log's public key.
+        NOTE that this document does not describe how clients obtain the log' public keys.
+        TLS clients MUST reject SCTs whose timestamp is in the future.>
+
+        For now the only thing that we can do is to ensure that the timestamp ain't in the future.
+        Because there isn't way to know the certificate's server log to extract the public key
+	"""
+        #TODO parse SignedCertificateTimestamp
+
+        cert_sct = client_pb2.SignedCertificateTimestamp()
         #self.ocsp.check_certificate_transparency()
         cert, _ = decoder.decode(self.certs[0],asn1Spec=rfc2459.Certificate())
         tbsCertificate = cert.getComponentByName('tbsCertificate')
@@ -162,10 +185,11 @@ class AuthCertificate(threading.Thread):
         sct = None
         for ext in extensions:
             if ext.getComponentByPosition(0) == univ.ObjectIdentifier((1,3,6,1,4,1,11129,2,4,2)):
-                sct =  str(ext.getComponentByPosition(2)).encode('hex')
+                sct =  ext.getComponentByPosition(2)
         if sct != None:
             with self.lock:
                 print self.cert_nss[0].make_ca_nickname()
+                cert_sct.ParseFromString(sct)
                 print 'Signed Certificate Timestamp found ' + sct
         else:
             s = self.ocsp.check_certificate_transparency()
@@ -175,6 +199,13 @@ class AuthCertificate(threading.Thread):
 
 
     def verify_dnssec_tlsa(self):
+        """
+        DNNSEC/TLSA
+
+        We retrieve the TLSA record of the domain and compare both fingerprints. If they are equal everything OK
+        If not it could be a possible attack. Now perhaps isn't realistic because isn't widely deployed and some sites
+        does not update the TLSA record for its domain. This need maybe more research
+        """
         import dns.resolver
         import hashlib
 
@@ -217,7 +248,7 @@ class AuthCertificate(threading.Thread):
         if result == True:
             with self.lock:
                 print colored('The certificate %s with id %s has a valid TLSA record' % (cert.make_ca_nickname(), cert.serial_number), 'magenta')
-            return 
+            return
         if url[0:3] == "www":
             url = url.replace("www.",'')
             result = verify(url)
@@ -232,6 +263,14 @@ class AuthCertificate(threading.Thread):
             print colored('The certificate %s with id %s has not a valid TLSA record or not implement DANE/DNSSEC' % (cert.make_ca_nickname(), cert.serial_number), 'white')
 
     def verify_ocsp(self):
+        """
+        We check the OCSP status of our certificate
+
+        Visit this domain : https://testssl-revoked-r2i2.disig.sk/index.en.html
+
+        This software if it is running in Mac OS X will show you a notification seeing that the site is revoked.
+        In Chrome with the default settings everything is OK. I have not find a way to enable OCSP in chrome
+        """
         status, certId = self.ocsp.check_ocsp()
         name = self.cert_nss[0].make_ca_nickname()
         if status == None:
@@ -242,6 +281,7 @@ class AuthCertificate(threading.Thread):
             self._notify_mitm(title='OCSP-MITM')
             with self.lock:
                 print colored('This certificate %s with id  %s is revoked' % (name, certId),'red')
+                self._log_fail()
         else:
             with self.lock:
                 print colored('This certificate %s with id %s is not revoked' % (name, certId),'cyan')
@@ -284,12 +324,14 @@ class AuthCertificate(threading.Thread):
 
 
     def verify_cert_with_pinning(self):
+        """
+        We pin our certificates each time that we see it. 
+        """
         from Crypto.Util.asn1 import DerSequence
         import sha3
         s = hashlib.new("sha3_512")
         try:
-            # We extract SubjectPublicKeyInfo. Why? Because everybody say that is the best part of the certificate
-            #to do that. If you want more information about it search it in Google
+            # We extract SubjectPublicKeyInfo
 
             der = self.certs[0]
             cert_dec = DerSequence()
@@ -320,6 +362,7 @@ class AuthCertificate(threading.Thread):
                     with self.lock:
                         print colored(cad,'red')
                     self._notify_mitm(title=_id)
+                    self._log_fail()
 
                 else:
                     cad = 'Nothing changed ' + _id
@@ -330,6 +373,12 @@ class AuthCertificate(threading.Thread):
 
 
     def verify_cert_with_icsi_notary(self):
+
+        """
+        ICSI_NOTARY is used to know the "fame" of a certificate. It Provides a means to know if a certificate
+        is widely seen. But it doesn't mean we are under MITM attack
+        """
+
         import dns
         from dns import resolver
         cert = self.cert_nss[0]

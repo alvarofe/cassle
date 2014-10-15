@@ -16,14 +16,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#This gonna be a class that we'll be initialized with raw data. self.messages will contain all the tls message related with handshake
+
+
+
 
 from tls import tls_types
-#import sys
-from utils.util import hexdump
 from tls.tls_verification import TLSVerificationDispatch
 
-#TODO try find another name for this class
 #The work of this class is to decode and organize all the messages that we captured
 class TLSStream():
     """
@@ -43,7 +42,7 @@ class TLSStream():
 
     def _process_tcp_stream(self, raw_data):
         """
-        Method that assemblies tcp streams to process it latter. 
+        Method that assemblies tcp streams to process it latter.
         """
 
         # raw_data in reality is the stream that we collected in the function assembler in util.py
@@ -60,11 +59,12 @@ class TLSStream():
         Method to extract certificate message from tls_record
         """
 
-        #TODO try to refactor here
 
         # To understand better this use wireshark to disseminate each message and see
         # each structure
-        
+
+        #Maybe there is a way to do the same better, more elegant. Feel free to modify this
+
         message = self._handshake_message.encode('hex')
         self._found = False
         try:

@@ -25,6 +25,8 @@ from config import Config
 f = file('../config/config.cfg')
 cfg = Config(f).config
 
+
+
 if __name__ == '__main__':
     parser = optparse.OptionParser("usage: %prog -a <True/False>")
     parser.add_option('-a', '--add', dest='add',default=True,help='Bool indicate if add or substrate cert')
@@ -41,8 +43,9 @@ if __name__ == '__main__':
             if os.path.isfile(os.path.join(certs,i)):
                 j = i.replace('_-_',' ').replace('_',' ').strip('.crt')
                 #certutil -A -n jsmith@netscape.com -t "p,p,p" -i mycert.crt -d certdir
-                subprocess.call(["certutil", "-A","-n",j,'-t','C,,,','-a','-i',certs+i,
-                    '-d',certdb])
+                cmdstr = ["openssl", "x509","-in",certs+i, "-inform","DER","-out", certs+i, "-outform","PEM"]
+                subprocess.call(cmdstr)
+                subprocess.call(["certutil", "-A","-n",j,'-t','C,,,','-a','-i',certs+i,'-d',certdb])
     else:
         for i in os.listdir(certs):
             if os.path.isfile(os.path.join(certs,i)):

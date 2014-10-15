@@ -38,6 +38,8 @@ class TLSVerificationDispatch():
 
 
     def verify_auth_certificate(self):
+	#screen_lock is only to print in the console 
+        global screen_lock
         #Do everything related with certificate
         if self.certificates is not None:
             #verify certificate

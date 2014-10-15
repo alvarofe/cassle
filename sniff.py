@@ -30,12 +30,10 @@ from db.database import database
 from apscheduler.schedulers.background import BackgroundScheduler
 
 
-
-f = file('config/config.cfg')
+f = open('config/config.cfg')
 cfg = Config(f).db
 f.close()
 scheduler = BackgroundScheduler()
-
 
 def drop():
     db = database("pfc", "pinning")
@@ -89,14 +87,17 @@ def init_ssl_blacklist():
                 pass
     db = database(cfg.db_name, "blacklist")
     db.set_black_list(fingerprints)
-    os.remove(file) 
+    os.remove(file)
 
 
 
 if __name__ == '__main__':
+
     # This is to delete the pinning database each day to avoid that an evil site perform MITM attacks over our connections
     # That's why because in our code we save the pinning each time that we visite a site. But if this site is evil we are saving bad pinning 
-    # so we have to delete the database to ensure that evil site has been deleted. You can change the seconds.
+    # so we have to delete the database to ensure that evil site has been deleted. You can change the seconds in the configuration file
+
+
     scheduler.add_job(drop, 'interval', seconds=cfg.time_remove)
     scheduler.start()
 
@@ -111,6 +112,6 @@ if __name__ == '__main__':
 
     ssl_blacklist = threading.Thread(target=init_ssl_blacklist)
     ssl_blacklist.start()
-    
+
     s = sniff()
     s.sniff()
