@@ -24,21 +24,57 @@ A continuation the list of different techniques that the project is using:
 Installation
 ============
 
-  Prerequisites
-  -------------
+-
+
+#### Prerequisites
+ 
+
+ 
   * Python >= 2.7 (www.python.org)
   * libpcap-python - <http://sourceforge.net/projects/pylibpcap/>
-  * Python binding for NSS - **$ pip install python-nss**
-  * M2Crypto - **$ pip install M2Crypto**
-  * pyasn1 - **$ pip install pyasn1**
-  * pync - Python Wrapper for Mac OS 10.8 Notification Center - **$ pip install pync** (This is only for Mac OS X)
-  * Termcolor - **$ pip install termcolor**
-  * pymongo - **$ pip install pymongo** (we must have installed mongo in our computer before <http://www.mongodb.org/> )
-  * python-wget **$ pip install wget**
-  * config **$ pip install config**
+  * Python binding for NSS - `$ pip install python-nss`
+  * M2Crypto - `$ pip install M2Crypto`
+  * pyasn1 - `$ pip install pyasn1`
+  * pync - Python Wrapper for Mac OS 10.8 Notification Center - `$ pip install pync` (This is only for Mac OS X)
+  * Termcolor - `$ pip install termcolor`
+  * pymongo - `$ pip install pymongo` (we must have installed mongo in our computer before <http://www.mongodb.org/> )
+  * python-wget `$ pip install wget`
+  * config `$ pip install config`
+  * apscheduler `$ pip install apscheduler`
 
----
-Once installed all packages: **./sniff.py -i < interface to sniff >**
+-
+Once installed all packages and before to launch the program we have to set our ROOT certificates. First we have to configure our directory to hold them. 
+
+```bash
+$ mkdir -p ~/.pki/nssdb
+$ cd ~/.pki/nssdb
+$ certutil -N -d .
+```
+I use this but whatever directory is fine. If you change the directory you have to change the config file and set `NSS_DB_DIR`. By the default is "~/.pki/nssdb". Also we have to put in the config file where are our certificates `CERTS_DIR` . This project provide the ROOT Mozilla's certificates in the certs folder. Also you should set the log directory `LOG_DIR`.
+
+```bash
+$ cd {project}
+$ cd utils
+$ python add_certs_to_nssdb 
+```
+
+NOTE: certutil goes wrong with der encoding so I had to convert to PEM and then install it in the nssdb. I have provided this script but if you want to write your own, feel free to do it
+
+-
+###### OPTIONAL
+
+Also I provide a script to set pinning of our choice. These pinning won't be erased each X seconds due to they are confident for us. The rest of the pinning that we see it whilst navigate will be erased each X seconds. This number of seconds is configured in our config file `time_remove`.
+
+```bash
+$ cd {projec}/utils
+$ python add_pin_to_db.py -f <folder that hold certificates>
+```
+-
+
+So once we have our system ready we can execute the main program.
+```bash
+./sniff.py -i < interface to sniff >
+```
 
 
 State
