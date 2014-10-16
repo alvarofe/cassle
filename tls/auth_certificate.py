@@ -19,6 +19,7 @@
 #Here all related with the verification through certficate
 
 #from utils import util
+
 import M2Crypto.X509
 from M2Crypto.X509 import FORMAT_DER
 
@@ -36,7 +37,6 @@ from  pyasn1.codec.der import decoder
 from pyasn1_modules import  rfc2459
 from pyasn1.type import univ
 import hashlib
-from ct.proto import client_pb2
 
 
 
@@ -177,7 +177,6 @@ class AuthCertificate(threading.Thread):
 	"""
         #TODO parse SignedCertificateTimestamp
 
-        cert_sct = client_pb2.SignedCertificateTimestamp()
         #self.ocsp.check_certificate_transparency()
         cert, _ = decoder.decode(self.certs[0],asn1Spec=rfc2459.Certificate())
         tbsCertificate = cert.getComponentByName('tbsCertificate')
@@ -185,11 +184,10 @@ class AuthCertificate(threading.Thread):
         sct = None
         for ext in extensions:
             if ext.getComponentByPosition(0) == univ.ObjectIdentifier((1,3,6,1,4,1,11129,2,4,2)):
-                sct =  ext.getComponentByPosition(2)
+                sct =  ext.getComponentByPosition(2).encode('hex')
         if sct != None:
             with self.lock:
                 print self.cert_nss[0].make_ca_nickname()
-                cert_sct.ParseFromString(sct)
                 print 'Signed Certificate Timestamp found ' + sct
         else:
             s = self.ocsp.check_certificate_transparency()
@@ -269,7 +267,6 @@ class AuthCertificate(threading.Thread):
         Visit this domain : https://testssl-revoked-r2i2.disig.sk/index.en.html
 
         This software if it is running in Mac OS X will show you a notification seeing that the site is revoked.
-        In Chrome with the default settings everything is OK. I have not find a way to enable OCSP in chrome
         """
         status, certId = self.ocsp.check_ocsp()
         name = self.cert_nss[0].make_ca_nickname()
@@ -278,7 +275,7 @@ class AuthCertificate(threading.Thread):
                 print colored('The certificate %s with id  %s does not have OCSP URI' % (name, certId),'white')
             return
         if status == 'revoked':
-            self._notify_mitm(title='OCSP-MITM')
+            self._notify_mitm(title='OCSP - '+self.cert_nss[0].subject_common_name)
             with self.lock:
                 print colored('This certificate %s with id  %s is revoked' % (name, certId),'red')
                 self._log_fail()
@@ -320,7 +317,7 @@ class AuthCertificate(threading.Thread):
                 with self.lock:
                     print colored('This certificate %s is not safe through the RFC process ' % (serial + ' - ' + ca_name),'red')
                 self._log_fail()
-                self._notify_mitm(title='RFC-MITM')
+                self._notify_mitm(title='RFC - '+cert.subject_common_name)
 
 
     def verify_cert_with_pinning(self):
@@ -361,7 +358,7 @@ class AuthCertificate(threading.Thread):
                     cad = 'This certificate %s changed' % _id
                     with self.lock:
                         print colored(cad,'red')
-                    self._notify_mitm(title=_id)
+                    self._notify_mitm(title='Pinning -' + cert.subject_common_name)
                     self._log_fail()
 
                 else:
@@ -404,7 +401,7 @@ class AuthCertificate(threading.Thread):
             s = last_seen - first_seen  + 1
             if s - times_seen >= cfg.icsi.maximum_interval:
                 cad = "This certificate %s is not ENOUGH secure according to icsi_notary" % (cert.make_ca_nickname())
-                self._notify_mitm(title='ICSI-MITM')
+                self._notify_mitm(title='ICSI - ' +  cert.subject_common_name)
                 with self.lock:
                     print colored(cad,'red')
             else:
