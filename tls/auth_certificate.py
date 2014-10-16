@@ -184,11 +184,12 @@ class AuthCertificate(threading.Thread):
         sct = None
         for ext in extensions:
             if ext.getComponentByPosition(0) == univ.ObjectIdentifier((1,3,6,1,4,1,11129,2,4,2)):
-                sct =  ext.getComponentByPosition(2).encode('hex')
+                sct =  str(ext.getComponentByPosition(2))
+                #sct = ext.getComponentByPosition(2)
         if sct != None:
             with self.lock:
                 print self.cert_nss[0].make_ca_nickname()
-                print 'Signed Certificate Timestamp found ' + sct
+                print 'Signed Certificate Timestamp found ' + sct.encode('hex')
         else:
             s = self.ocsp.check_certificate_transparency()
             if s != None:
@@ -343,8 +344,6 @@ class AuthCertificate(threading.Thread):
             serial = cert.serial_number
             _id = str(serial) + ' - ' + cert.make_ca_nickname()
             exist = self.db_pin.get(_id)
-            with self.lock:
-                print hash_t
             if exist == None:
                 # That means that the certificate is not in the database, it's the first time it was seen
                 self.db_pin.set_pin(hash_t, _id)
