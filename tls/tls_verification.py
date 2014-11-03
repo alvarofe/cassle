@@ -19,6 +19,7 @@
 from tls.auth_certificate import AuthCertificate
 import Queue
 import threading
+from tls.cert import Certificate
 
 screen_lock = threading.Lock()
 
@@ -38,7 +39,7 @@ class TLSVerificationDispatch():
 
 
     def verify_auth_certificate(self):
-	#screen_lock is only to print in the console 
+        #screen_lock is only to print in the console
         global screen_lock
         #Do everything related with certificate
         if self.certificates is not None:
@@ -46,8 +47,11 @@ class TLSVerificationDispatch():
 
             # The queue will be use to return the result of the validation. With that note we will provide a answer if our connection is secure enough to continue navigating
             result_queue = Queue.Queue()
-            # The screen_lock will be shared for all the instance that is running 
-            auth_cert_thread = AuthCertificate(self.certificates,result_queue, screen_lock)
+            # The screen_lock will be shared for all the instance that is running
+
+            #TODO add here a class that parse self.certificates to pass to AuthCertificate
+            cert = Certificate(self.certificates)
+            auth_cert_thread = AuthCertificate(cert,result_queue, screen_lock)
             auth_cert_thread.daemon = True
             auth_cert_thread.start()
             #print result_queue.get()
@@ -55,7 +59,7 @@ class TLSVerificationDispatch():
         else:
             pass
 
-    # Our project won't add OCSP stapling support because is not widely support. But like we did for certificate message 
+    # Our project won't add OCSP stapling support because is not widely support. But like we did for certificate message
     # the same way would be for the OCSP stapling message in the handshake. Once we have it add all the logic necessary to validate it
     def verify_auth_ocsp_stapling(self):
         if self.ocsp_stapling is not None:

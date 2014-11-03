@@ -20,7 +20,7 @@
 import optparse
 import os
 import nss.nss as nss
-from config import Config
+from config import config
 import M2Crypto.X509
 from M2Crypto.X509 import FORMAT_DER
 import hashlib
@@ -32,9 +32,7 @@ sys.path.append('../db')
 from database import database
 
 
-f = open('../config/config.cfg')
-cfg = Config(f)
-f.close()
+
 
 if __name__ == '__main__':
     parser = optparse.OptionParser("usage: %prog -f <folder with certificates> ")
@@ -47,7 +45,7 @@ if __name__ == '__main__':
 
     path = os.path.expanduser(opts.folder)
 
-    certdb_dir = os.path.expanduser(cfg.config.NSS_DB_DIR)
+    certdb_dir = os.path.expanduser(config.NSS_DB_DIR)
     nss.nss_init(certdb_dir)
     certdb = nss.get_default_certdb()
     db = database("pfc", "pinning")

@@ -23,7 +23,7 @@
 
 from pymongo import MongoClient
 
-class database:
+class Database:
 
         def __init__(self,db_name,collection):
             """
@@ -138,7 +138,7 @@ class database:
 
 # Only use for test
 if __name__ == '__main__':
-    db = database("pfc", "pinning")
+    db = Database("pfc", "pinning")
     db.set_pin(8098098098, "Verisign")
     print db.get("Verisign")
     print db.compare("Verisign", 8098098098)

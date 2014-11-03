@@ -24,10 +24,9 @@ from pyasn1.type import univ
 import hashlib
 import M2Crypto.X509
 from M2Crypto.X509 import FORMAT_DER
-from datetime import datetime
 #from pyasn1.type.useful import GeneralizedTime
 
-#All the code was extracted from  bit.ly/1mxntVN 
+#All the code was extracted from  bit.ly/1mxntVN
 
 import re
 import urllib2
@@ -55,13 +54,13 @@ class Ocsp:
     All the things related with ocsp
     """
 
-    def __init__(self,issuer_cert, user_cert):
-        self.issuer_cert = issuer_cert
-        self.user_cert = user_cert
+    def __init__(self,cert):
+        self.issuer_cert = cert.get_cert_der(1)
+        self.user_cert = cert.get_cert_der()
         self._extract_ocsp_uri()
         self.valueOnlyBitStringEncoder = ValueOnlyBitStringEncoder()
         self.tbsResponseData = None
-        
+
 
     def _extract_ocsp_uri(self):
         cert = M2Crypto.X509.load_cert_string(self.user_cert,FORMAT_DER)
@@ -109,7 +108,7 @@ class Ocsp:
 
     def make_ocsp_request(self,issuerCert, userCert):
         issuerTbsCertificate = issuerCert.getComponentByName('tbsCertificate')
-        issuerSubject = issuerTbsCertificate.getComponentByName('subject')
+        #issuerSubject = issuerTbsCertificate.getComponentByName('subject')
 
         userTbsCertificate = userCert.getComponentByName('tbsCertificate')
         userIssuer = userTbsCertificate.getComponentByName('issuer')

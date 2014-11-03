@@ -24,22 +24,21 @@ import argparse
 from utils.util import decode_packet
 import threading
 import os
-from config import Config
+from config import config
 import subprocess
-from db.database import database
+from db.database import Database
 from apscheduler.schedulers.background import BackgroundScheduler
 
+#TODO add better support to log
 
-f = open('config/config.cfg')
-cfg = Config(f).db
-f.close()
+
 scheduler = BackgroundScheduler()
 
 def drop():
-    db = database("pfc", "pinning")
+    db = Database("pfc", "pinning")
     db.drop_pinning()
 
-class sniff:
+class Sniff:
     def __init__(self):
         parser = argparse.ArgumentParser(description='Certificate Validation')
         parser.add_argument('-i','--interface',help='specify interface to sniff')
@@ -75,7 +74,7 @@ def init_ssl_blacklist():
     """
     import wget
     import csv
-    from db.database import  database
+    from db.database import  Database
     fingerprints = list()
     file = wget.download('https://sslbl.abuse.ch/blacklist/sslblacklist.csv',out='/tmp',bar=None)
     with open(file, 'rb') as csvfile:
@@ -85,7 +84,7 @@ def init_ssl_blacklist():
                 fingerprints.append(row[1].split(',')[1])
             except:
                 pass
-    db = database(cfg.db_name, "blacklist")
+    db = Database(config.DB_NAME, "blacklist")
     db.set_black_list(fingerprints)
     os.remove(file)
 
@@ -94,11 +93,11 @@ def init_ssl_blacklist():
 if __name__ == '__main__':
 
     # This is to delete the pinning database each day to avoid that an evil site perform MITM attacks over our connections
-    # That's why because in our code we save the pinning each time that we visite a site. But if this site is evil we are saving bad pinning 
+    # That's why because in our code we save the pinning each time that we visite a site. But if this site is evil we are saving bad pinning
     # so we have to delete the database to ensure that evil site has been deleted. You can change the seconds in the configuration file
 
 
-    scheduler.add_job(drop, 'interval', seconds=cfg.time_remove)
+    scheduler.add_job(drop, 'interval', seconds=config.DB_TIME_REMOVE)
     scheduler.start()
 
     print '***** launching mongo daemon *****'
@@ -113,5 +112,5 @@ if __name__ == '__main__':
     ssl_blacklist = threading.Thread(target=init_ssl_blacklist)
     ssl_blacklist.start()
 
-    s = sniff()
+    s = Sniff()
     s.sniff()

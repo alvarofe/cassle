@@ -20,18 +20,16 @@
 import optparse
 import subprocess
 import sys,os
-from config import Config
+from config import config
 
-f = file('../config/config.cfg')
-cfg = Config(f).config
 
 
 
 if __name__ == '__main__':
     parser = optparse.OptionParser("usage: %prog -a <True/False>")
     parser.add_option('-a', '--add', dest='add',default=True,help='Bool indicate if add or substrate cert')
-    certs = os.path.expanduser(cfg.CERTS_DIR)
-    certdb = os.path.expanduser(cfg.NSS_DB_DIR)
+    certs = os.path.expanduser(config.CERTS_DIR)
+    certdb = os.path.expanduser(config.NSS_DB_DIR)
 
     (opts, args) = parser.parse_args()
     if (certs == None) | (certdb == None):

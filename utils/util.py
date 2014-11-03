@@ -21,7 +21,6 @@ import struct
 import socket
 # import pcap
 from tls import tls_types
-from pprint import pprint
 
 
 
@@ -46,9 +45,9 @@ def decode_packet(pktlen, datos, timestamp):
     if datos[12:14] == '\x08\x00':
         packet = datos[14:]
         ip_header = packet[0:20]
-     
+
         """
-        The ip_headers looks like 
+        The ip_headers looks like
 
         typedef struct header
         {
@@ -63,22 +62,22 @@ def decode_packet(pktlen, datos, timestamp):
             unsigned short int ip_sum;  //2 Byte
             unsigned int ip_src;        //4 Byte
             unsigned int ip_dst;        //4 Byte
-        }   
+        }
         """
         iph = struct.unpack('!BBHHHBBH4s4s' , ip_header)
         version_ihl = iph[0]
         version = version_ihl >> 4
         ihl = version_ihl & 0xF
-        iph_length = ihl * 4  
+        iph_length = ihl * 4
         ttl = iph[5]
         protocol = iph[6]
         s_addr = socket.inet_ntoa(iph[8]);
         d_addr = socket.inet_ntoa(iph[9]);
-         
+
         # print 'Version : ' + str(version) + ' IP Header Length : ' + str(ihl) + ' TTL : ' + str(ttl) + ' Protocol : ' + str(protocol) + ' Source Address : ' + str(s_addr) + ' Destination Address : ' + str(d_addr)
 
         tcp_header = packet[iph_length:iph_length+20]
-         
+
         """
         TCP headers looks like
 
@@ -103,12 +102,12 @@ def decode_packet(pktlen, datos, timestamp):
         doff_reserved = tcph[4]
         flag = tcph[5]
         tcph_length = doff_reserved >> 4
-         
+
         # print 'Source Port : ' + str(source_port) + ' Dest Port : ' + str(dest_port) + ' Sequence Number : ' + str(sequence) + ' Acknowledgement : ' + str(acknowledgement) + ' TCP header length : ' + str(tcph_length) + ' Flag: ' + str(flag)
-         
+
         h_size = iph_length + tcph_length * 4
         data_size = len(packet) - h_size
-         
+
         #get data from the packet
         data = packet[h_size:]
         assembler(data.encode('hex'), s_addr, d_addr, source_port, dest_port,flag, str(sequence))
@@ -134,8 +133,8 @@ def assembler(data,s_addr, d_addr, source_port, dest_port, flag, sequence):
 
     Parameters:
         -data : The TCP data encode in hex. This is because then is more easy manipulate the data
-        -s_addr : The src IP 
-        -d_addr : The dst IP 
+        -s_addr : The src IP
+        -d_addr : The dst IP
         -source_port : The src port
         -dest_port : The dest port
         -flag: The TCP flag of our tcp packet
@@ -149,24 +148,24 @@ def assembler(data,s_addr, d_addr, source_port, dest_port, flag, sequence):
     dport = str(dest_port)
     recollect = False
 
-    
+
     id = (src,dst,sport,dport)
     try:
         recollect = metadata[id]['recollect']
     except KeyError:
         recollect = False
-        
+
     if flag == 16:
         #16 means ACK
         if recollect == True:
             metadata[id]['data'][sequence] = data.decode('hex')
         elif is_server_hello_message(data) or is_alert_message(data):
-            # We start collect data when a new connection is seen. Usually all the connection start with Server Hello message. 
+            # We start collect data when a new connection is seen. Usually all the connection start with Server Hello message.
             # I put also Alert Message bacause some certificates come after this message. I saw this through wireshark
             metadata[id] = dict()
             metadata[id]['data'] = dict()
             metadata[id]['recollect'] = True # That True says that with that id we can put data in it
-            metadata[id]['psh-ack'] = 0 # The psh-ack is used as a flag to terminate the recollecting of data. After two psh-ack we already have the certificate message 
+            metadata[id]['psh-ack'] = 0 # The psh-ack is used as a flag to terminate the recollecting of data. After two psh-ack we already have the certificate message
                                         # so we don't need to recollect more data
             metadata[id]['data'][sequence] = data.decode('hex')
     if flag == 24:
