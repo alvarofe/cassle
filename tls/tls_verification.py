@@ -16,10 +16,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from tls.auth_certificate import AuthCertificate
-import Queue
 import threading
-from tls.cert import Certificate
+from tls.cert import X509Chain
+from handlers import handlers
+from tls.ocsp import Ocsp
 
 screen_lock = threading.Lock()
 
@@ -28,43 +28,51 @@ class TLSVerificationDispatch():
 
     def __init__(self, data):
 
-        self.certificates = None
-        self.ocsp_stapling = None
-        if 'certificate' in data:
-            self.certificates = data['certificate']
-        if 'ocsp_stapling' in data:
-            self.ocsp_stapling = data['ocsp_stapling']
-        self.verify_auth_certificate()
-        self.verify_auth_ocsp_stapling()
+        self.certs = None
+        self.status_request = None
+        if 'cert' in data:
+            self.certs = data['cert']
+        if 'status_request' in data:
+            self.status_request = data['status_request']
+        self.dispatch_certificate()
+        self.dispatch_status_request()
 
 
-    def verify_auth_certificate(self):
+    def dispatch_certificate(self):
         #screen_lock is only to print in the console
         global screen_lock
         #Do everything related with certificate
-        if self.certificates is not None:
+        if self.certs is not None:
             #verify certificate
-
-            # The queue will be use to return the result of the validation. With that note we will provide a answer if our connection is secure enough to continue navigating
-            result_queue = Queue.Queue()
-            # The screen_lock will be shared for all the instance that is running
-
-            #TODO add here a class that parse self.certificates to pass to AuthCertificate
-            cert = Certificate(self.certificates)
-            auth_cert_thread = AuthCertificate(cert,result_queue, screen_lock)
-            auth_cert_thread.daemon = True
-            auth_cert_thread.start()
-            #print result_queue.get()
+            try:
+                chain = X509Chain(self.certs)
+            except Exception as e:
+                print e
+                return
+            if chain.length_chain() == 1:
+                print '[-] Chain incomplete'
+                return
+            else:
+                ocsp = Ocsp(chain)
+                print '[+] Verifying certificate'
+                for cls in handlers.store:
+                    instance = handlers.store[cls]()
+                    if instance.cert == True:
+                        instance.on_certificate(chain)
+                    if instance.ocsp == True:
+                        instance.on_ocsp_response(ocsp)
 
         else:
             pass
 
-    # Our project won't add OCSP stapling support because is not widely support. But like we did for certificate message
-    # the same way would be for the OCSP stapling message in the handshake. Once we have it add all the logic necessary to validate it
-    def verify_auth_ocsp_stapling(self):
-        if self.ocsp_stapling is not None:
+
+    def dispatch_status_request(self):
+        if self.dispatch_status_request is not None:
             #verify connection through ocsp_stapling
             #In the future only add here all the code needed
             pass
         else:
             pass
+
+
+

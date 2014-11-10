@@ -25,17 +25,23 @@ from utils.util import decode_packet
 import threading
 import os
 from config import config
-import subprocess
+#import subprocess
 from db.database import Database
 from apscheduler.schedulers.background import BackgroundScheduler
+from notification.event_notification import MITMNotification
+from notification.notification_osx import NotificationOSX
+#from utils.mail_notification import MailNotification
 
-#TODO add better support to log
+
+#from OpenSSL import SSL
+
+
 
 
 scheduler = BackgroundScheduler()
 
 def drop():
-    db = Database("pfc", "pinning")
+    db = Database(config.DB_NAME, "pinning")
     db.drop_pinning()
 
 class Sniff:
@@ -76,7 +82,7 @@ def init_ssl_blacklist():
     import csv
     from db.database import  Database
     fingerprints = list()
-    file = wget.download('https://sslbl.abuse.ch/blacklist/sslblacklist.csv',out='/tmp',bar=None)
+    file = wget.download('https://sslbl.abuse.ch/blacklist/sslblacklist.csv',out='/tmp/',bar=None)
     with open(file, 'rb') as csvfile:
         reader  = csv.reader(csvfile, delimiter=' ', quotechar='|')
         for row in reader:
@@ -88,7 +94,8 @@ def init_ssl_blacklist():
     db.set_black_list(fingerprints)
     os.remove(file)
 
-
+def stub_verify(conn,cert,errno,errdepth,code):
+    return True
 
 if __name__ == '__main__':
 
@@ -100,17 +107,23 @@ if __name__ == '__main__':
     scheduler.add_job(drop, 'interval', seconds=config.DB_TIME_REMOVE)
     scheduler.start()
 
-    print '***** launching mongo daemon *****'
-    devnull = open('/dev/null', 'w')
-    try:
-        subprocess.Popen('mongod',stdout=devnull)
-    except:
-        pass
-    print '***** launched mongo daemon *****'
+    #print '***** launching mongo daemon *****'
+    #devnull = open('/dev/null', 'w')
+    #try:
+        #subprocess.Popen('mongod',stdout=devnull)
+    #except:
+        #pass
+    #print '***** launched mongo daemon *****'
 
+    #Configure type of notifications
 
-    ssl_blacklist = threading.Thread(target=init_ssl_blacklist)
-    ssl_blacklist.start()
+    MITMNotification.register(NotificationOSX())
+    #MITMNotification.register(MailNotification())
+
+    print '[+] Downloading SSL blacklist'
+    init_ssl_blacklist()
+    print '[+] SSL blacklist downloaded'
+    print '[+] Sniffing'
 
     s = Sniff()
     s.sniff()

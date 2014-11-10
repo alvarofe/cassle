@@ -9,12 +9,12 @@ DB_NAME = "pfc"
 DB_TIME_REMOVE = 100
 
 
-V_RFC = True
-V_PINNING = True
-V_CT = True
-V_DNSSEC = True
-V_ICSI = True
-V_BLACKLIST = True
+V_RFC = False
+V_PINNING = False
+V_CT = False
+V_DNSSEC = False
+V_ICSI = False
+V_BLACKLIST = False
 V_OCSP = True
 
 

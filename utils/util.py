@@ -21,7 +21,7 @@ import struct
 import socket
 # import pcap
 from tls import tls_types
-
+from tls.tls_stream import TLSStream
 
 
 #The code for hexdump was extracted from dpkt source code
@@ -110,24 +110,27 @@ def decode_packet(pktlen, datos, timestamp):
 
         #get data from the packet
         data = packet[h_size:]
-        assembler(data.encode('hex'), s_addr, d_addr, source_port, dest_port,flag, str(sequence))
+        assembler(data, s_addr, d_addr, source_port, dest_port,flag, str(sequence))
 
 
-def is_server_hello_message(data):
-    if data[0:2] == tls_types.TLS_HANDSHAKE and data[10:12] == tls_types.TLS_H_TYPE_SERVER_HELLO:
+def is_initial_record(data):
+    try:
+        content_type,version_mayor,version_minor,length,msg_type = struct.unpack_from("!BBBHB",data,0)
+    except:
+        #It isn't a tls_record
+        return False
+    if content_type == tls_types.TLS_HANDSHAKE and msg_type == tls_types.TLS_H_TYPE_SERVER_HELLO:
+        return True
+    elif content_type == tls_types.TLS_ALERT and version_mayor == 3 and (version_minor == 1 or version_minor == 3):
         return True
     else:
         return False
-def is_alert_message(data):
-    if data[0:2] == tls_types.TLS_ALERT and (data[2:6] == '0303' or data[2:6] == '0301'):
-        return True
-    else:
-        return False
-
 
 metadata = dict()
 
 def assembler(data,s_addr, d_addr, source_port, dest_port, flag, sequence):
+
+    #TODO change everythin here to use struct
     """
     Function that assembles all the packets to produce a stream of tls. But we start to assembles it when serverHello o alertMessage is seen
 
@@ -158,8 +161,9 @@ def assembler(data,s_addr, d_addr, source_port, dest_port, flag, sequence):
     if flag == 16:
         #16 means ACK
         if recollect == True:
-            metadata[id]['data'][sequence] = data.decode('hex')
-        elif is_server_hello_message(data) or is_alert_message(data):
+            metadata[id]['data'][sequence] = data
+
+        elif is_initial_record(data):
             # We start collect data when a new connection is seen. Usually all the connection start with Server Hello message.
             # I put also Alert Message bacause some certificates come after this message. I saw this through wireshark
             metadata[id] = dict()
@@ -167,28 +171,23 @@ def assembler(data,s_addr, d_addr, source_port, dest_port, flag, sequence):
             metadata[id]['recollect'] = True # That True says that with that id we can put data in it
             metadata[id]['psh-ack'] = 0 # The psh-ack is used as a flag to terminate the recollecting of data. After two psh-ack we already have the certificate message
                                         # so we don't need to recollect more data
-            metadata[id]['data'][sequence] = data.decode('hex')
+            metadata[id]['data'][sequence] = data
     if flag == 24:
         #24 means PSH-ACK
         if recollect == True:
-            if metadata[id]['psh-ack'] != 2:
+            if metadata[id]['psh-ack'] != 3:
                 metadata[id]['psh-ack'] += 1
-                metadata[id]['data'][sequence] = data.decode('hex')
+                metadata[id]['data'][sequence] = data
             else:
                 #Second PSH-ACK received
-                metadata[id]['data'][sequence] = data.decode('hex')
+                metadata[id]['data'][sequence] = data
                 stream = metadata[id]['data']
-                process_stream(stream)
+                #process_stream(stream)
+                TLSStream(stream)
                 del (metadata[id])
 
 
 def process_stream(tls_stream):
-    #To break import loop
-    from tls.tls_stream import TLSStream
-    TLSStream(tls_stream)
-    # aux = str()
-    # for key in sorted(tls_stream):
-    #     aux += tls_stream[key]
-    # print hexdump(aux)
+    tls_stream = TLSStream(tls_stream)
 
 
