@@ -1,8 +1,14 @@
 from handlers import handlers, handler
 from handlers.base import BaseHandler
 import dns.resolver
+from conf import config, debug_logger
+import logging
 
-@handler(handlers,handler=True)
+
+
+logger = logging.getLogger(__name__)
+
+@handler(handlers,handler=config.V_TLSA)
 class TLSA(BaseHandler):
 
     name = "tlsa"
@@ -27,13 +33,13 @@ class TLSA(BaseHandler):
         try:
             url = cert.subject_common_name()
         except IndexError:
-            print "\t[-] ERROR extracting subject_common_name"
+            debug_logger.debug("\t[-] ERROR extracting subject_common_name")
             return
         result = False
         result = verify(url)
 
         if result == True:
-            print "\t[+] Certificate %s has a valid TLSA record" % cert.ca_name()
+            debug_logger.debug("\t[+] Certificate %s has a valid TLSA record" % cert.ca_name())
             return
         if url[0:3] == "www":
             url = url.replace("www.",'')
@@ -42,6 +48,7 @@ class TLSA(BaseHandler):
             url = url.replace('*','www')
             result = verify(url)
         if result == True:
-            print "\t[+] Certificate %s has a valid TLSA record" % cert.ca_name()
+            debug_logger.debug("\t[+] Certificate %s has a valid TLSA record" % cert.ca_name())
             return
-        print "\t[-] Certificate %s has not a valid TLSA record" % cert.ca_name()
+        debug_logger.debug("\t[-] Certificate %s has not a valid TLSA record" % cert.ca_name())
+

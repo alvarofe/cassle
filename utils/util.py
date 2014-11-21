@@ -130,7 +130,6 @@ metadata = dict()
 
 def assembler(data,s_addr, d_addr, source_port, dest_port, flag, sequence):
 
-    #TODO change everythin here to use struct
     """
     Function that assembles all the packets to produce a stream of tls. But we start to assembles it when serverHello o alertMessage is seen
 

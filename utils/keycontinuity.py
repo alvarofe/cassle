@@ -18,18 +18,19 @@
 
 
 import optparse
+import sys
 import os
 import nss.nss as nss
-from config import config
 import M2Crypto.X509
 from M2Crypto.X509 import FORMAT_DER
 import hashlib
 import sha3
 from Crypto.Util.asn1 import DerSequence
 import subprocess
-import sys
-sys.path.append('../db')
-from database import database
+sys.path.append("../")
+from db.database import Database
+from conf import config
+
 
 
 
@@ -48,7 +49,7 @@ if __name__ == '__main__':
     certdb_dir = os.path.expanduser(config.NSS_DB_DIR)
     nss.nss_init(certdb_dir)
     certdb = nss.get_default_certdb()
-    db = database("pfc", "pinning")
+    db = Database("pfc", "keycontinuity")
 
 
     for i in os.listdir(path):
@@ -79,14 +80,14 @@ if __name__ == '__main__':
                 spki = tbsCertificate[6]
             except:
                 #FIXME observing some outcomes with the certificates given the len(tbs)-1 is spki
-                #I don't know why due to spki in the rfc is in the 7th position. BTW maybe you have to 
+                #I don't know why due to spki in the rfc is in the 7th position. BTW maybe you have to
                 #research in this and adapt it based in yours certificates. Also you can develop your own script
-                #but is important to use nss because the main program use serial + make_ca_nickname 
+                #but is important to use nss because the main program use subjectPublicKeyInfo.id_str + subject_common_name
                 spki = tbsCertificate[len(tbsCertificate)-1]
             s.update(spki)
             hash_t = s.hexdigest()
-            serial = cert.serial_number
-            _id = str(serial) + ' - ' + cert.make_ca_nickname()
+            algorithm = cert.subject_public_key_info.algorithm.id_str
+            _id = str(algorithm) + ' - ' + cert.subject_common_name
             exist = db.get(_id)
             if exist == None:
                 db.set_pin(hash_t,_id,drop=False)

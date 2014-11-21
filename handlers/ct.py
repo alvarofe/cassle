@@ -1,9 +1,13 @@
 from handlers import handlers
 from handlers import handler
 from handlers.base import BaseHandler
+from conf import config, debug_logger
+import logging
 
 
-@handler(handlers,handler=True)
+logger = logging.getLogger(__name__)
+
+@handler(handlers,handler=config.V_CT)
 class CT(BaseHandler):
 
     name = "ct"
@@ -17,7 +21,7 @@ class CT(BaseHandler):
     def on_certificate(self,cert):
         sct = cert.get_ct_extension()
         if sct != None:
-            print "\t[+] Certificate %s has SCT %s" % (cert.ca_name(), sct.encode('hex'))
+            debug_logger.debug("\t[+] Certificate %s has SCT %s" % (cert.ca_name(), sct.encode('hex')))
         else:
             self._process_ocsp = True
             self._ca_name = cert.ca_name()
@@ -29,8 +33,9 @@ class CT(BaseHandler):
         if self._process_ocsp == True:
             sct = ocsp.check_certificate_transparency()
             if sct != None:
-                print "\t[+] Certificate %s has SCT %s" % (self._ca_name, sct.encode('hex'))
+                debug_logger.debug("\t[+] Certificate %s has SCT %s" % (self._ca_name, sct.encode('hex')))
             else:
-                print "\t[-] Certificate %s has not SCT" % self._ca_name
+                debug_logger.debug("\t[-] Certificate %s has not SCT" % self._ca_name)
+
 
 

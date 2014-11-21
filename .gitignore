@@ -1,4 +1,5 @@
 *.pyc
+
 ssl/*.pyc
 utils/*.pyc
 *.swp
@@ -6,6 +7,7 @@ ssl/*.swp
 utils/*.swp
 dump
 log
+log/*.log
 sslblacklist.csv
 prueba.py
 certs_prueba

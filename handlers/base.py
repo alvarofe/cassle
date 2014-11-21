@@ -3,6 +3,10 @@
 
 class BaseHandler():
 
+    """
+    Basic Class to extend its functionality to validate either certificate or ocsp_response
+    """
+
     def on_certificate(self,cert):
         """
         You must implement this method to received the certificate and work with it

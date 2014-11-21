@@ -2,11 +2,15 @@ from handlers import handlers
 from handlers import handler
 from notification.event_notification import MITMNotification
 from db.database import Database
-from config import config
 from handlers.base import BaseHandler
+from conf import config, debug_logger
+import logging
 
 
-@handler(handlers,handler=True)
+
+logger = logging.getLogger(__name__)
+
+@handler(handlers,handler=config.V_BLACKLIST)
 class Blacklist(BaseHandler):
 
     name = "blacklist"
@@ -18,9 +22,10 @@ class Blacklist(BaseHandler):
         fingerprint = cert.hash()
         query = db.get(fingerprint)
         if query == None:
-            print "\t[+] Certificate %s is safe against blacklist" % name
+            debug_logger.debug("\t[+] Certificate %s is safe against blacklist" % name)
         else:
-            print "\t[-] Certificate %s match with a malware site" % name
+            debug_logger.debug("\t[-] Certificate %s match with a malware site" % name)
+            logger.info("\t[-] Certificate %s match with a malware site" % name)
             MITMNotification.notify(title=self.name,message=cert.subject_common_name())
 
 db = Database(config.DB_NAME, Blacklist.name)

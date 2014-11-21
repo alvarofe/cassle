@@ -20,6 +20,11 @@ import threading
 from tls.cert import X509Chain
 from handlers import handlers
 from tls.ocsp import Ocsp
+import logging
+from conf import debug_logger
+
+
+logger = logging.getLogger(__name__)
 
 screen_lock = threading.Lock()
 
@@ -50,18 +55,21 @@ class TLSVerificationDispatch():
                 print e
                 return
             if chain.length_chain() == 1:
-                print '[-] Chain incomplete'
-                return
+                try:
+                    debug_logger.debug('[-] Chain incomplete from %s' % chain.ca_name())
+                    logger.info("The chain is incomplete %s" % chain.subject_common_name())
+                except Exception:
+                    debug_logger.debug('[-] Chain incomplete')
+                    logger.info('[-] Chain incomplete')
             else:
                 ocsp = Ocsp(chain)
-                print '[+] Verifying certificate'
+                debug_logger.debug('[+] Verifying certificate')
                 for cls in handlers.store:
                     instance = handlers.store[cls]()
                     if instance.cert == True:
                         instance.on_certificate(chain)
                     if instance.ocsp == True:
                         instance.on_ocsp_response(ocsp)
-
         else:
             pass
 

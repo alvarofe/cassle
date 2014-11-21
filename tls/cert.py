@@ -64,7 +64,10 @@ class X509Chain():
 
         deep : Which certificate in the chain you want to obtain the ca_name
         """
-        return self._certs_nss[deep].make_ca_nickname()
+        try:
+            return self._certs_nss[deep].make_ca_nickname()
+        except:
+            raise Exception("List index out of range in ca_name")
 
     def subject_public_key_info(self,deep=0):
         """
@@ -81,13 +84,13 @@ class X509Chain():
         except:
             raise Exception("subject_public_key_info issue")
 
-    def hash_spki(self,algorithm="sha3_512"):
+    def hash_spki(self,deep=0,algorithm="sha3_512"):
         """
         Return the hash of spki using the algorithm specified
 
         algorithm: Algorithm to hash the spki
         """
-        spki = self.subject_public_key_info()
+        spki = self.subject_public_key_info(deep)
         return self._fingerprint(spki,algorithm)
 
     def serial_number(self,deep=0):

@@ -1,4 +1,4 @@
-from config import config
+from conf import config
 import nss.nss as nss
 import os
 

@@ -5,11 +5,16 @@ from tls import nssconfig
 import nss.nss as nss
 from nss.error import NSPRError
 from handlers.base import BaseHandler
+from conf import config, debug_logger
+import logging
 
 intended_usage = nss.certificateUsageSSLServer
 
 
-@handler(handlers,handler=True)
+logger = logging.getLogger(__name__)
+
+
+@handler(handlers,handler=config.V_RFC)
 class Rfcnss(BaseHandler):
 
     name = "rfcnss"
@@ -21,7 +26,7 @@ class Rfcnss(BaseHandler):
         try:
             length = cert.length_chain()
             if length > 4:
-                print "\t[-] Certificate chain large > 4. It's a weird situtation"
+                debug_logger.debug("\t[-] Certificate chain large > 4. It's a weird situtation")
                 MITMNotification.notify(title="chain large",message=cert.subject_common_name())
                 return
             cert_nss = cert.get_cert_nss()
@@ -40,7 +45,8 @@ class Rfcnss(BaseHandler):
                 pass
 
         if approved_usage & intended_usage:
-            print "\t[+] Certificate %s is safe using NSS library" % name
+            debug_logger.debug("\t[+] Certificate %s is safe using NSS library" % name)
         else:
-            print "\t[-] Certificate %s is not safe using NSS library" % name
+            debug_logger.debug("\t[-] Certificate %s is not safe using NSS library" % name)
+            logger.info("\t[-] Certificate %s is not safe using NSS library" % name)
             MITMNotification.notify(title=self.name,message=cert.subject_common_name())
