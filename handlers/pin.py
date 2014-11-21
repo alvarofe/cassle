@@ -32,7 +32,7 @@ class Pinning(BaseHandler):
                 if spki == i:
                     debug_logger.debug("\t[+] pin correct %s " % name)
                     return
-            debug_logger.info("\t[-] Pin does not match %s" % name)
+            logger.info("\t[-] Pin does not match %s" % name)
             MITMNotification.notify(title="pinning",message=cert.subject_common_name())
         except:
             debug_logger.debug("\t[-] ")
