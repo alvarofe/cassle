@@ -36,59 +36,59 @@ from conf import config
 
 
 if __name__ == '__main__':
-    parser = optparse.OptionParser("usage: %prog -f <folder with certificates> ")
-    parser.add_option('-f','--folder', dest='folder',help = "Directory that holds certificates")
+  parser = optparse.OptionParser("usage: %prog -f <folder with certificates> ")
+  parser.add_option('-f', '--folder', dest = 'folder', help = "Directory that holds certificates")
 
 
-    (opts, args) = parser.parse_args()
-    if opts.folder == None:
-        parser.error("Specify the name of directory")
+  (opts, args) = parser.parse_args()
+  if opts.folder == None:
+    parser.error("Specify the name of directory")
 
-    path = os.path.expanduser(opts.folder)
+  path = os.path.expanduser(opts.folder)
 
-    certdb_dir = os.path.expanduser(config.NSS_DB_DIR)
-    nss.nss_init(certdb_dir)
-    certdb = nss.get_default_certdb()
-    db = Database("pfc", "keycontinuity")
+  certdb_dir = os.path.expanduser(config.NSS_DB_DIR)
+  nss.nss_init(certdb_dir)
+  certdb = nss.get_default_certdb()
+  db = Database("pfc", "keycontinuity")
 
 
-    for i in os.listdir(path):
-        file = os.path.join(path,i)
-        if os.path.isfile(file):
-            #f = open(file).readlines()
-            #f =  ''.join(f)
-            try:
-                a = M2Crypto.X509.load_cert(file,format=FORMAT_DER)
-            except:
-                #we should transform PEM encoding to DER
-                cmdstr = ["openssl", "x509","-in",file, "-inform","PEM","-out",file, "-outform","DER"]
-                subprocess.call(cmdstr)
-                a = M2Crypto.X509.load_cert(file,format=FORMAT_DER)
+  for i in os.listdir(path):
+    file = os.path.join(path, i)
+    if os.path.isfile(file):
+      #f = open(file).readlines()
+      #f =  ''.join(f)
+      try:
+        a = M2Crypto.X509.load_cert(file, format=FORMAT_DER)
+      except:
+          #we should transform PEM encoding to DER
+        cmdstr = ["openssl", "x509", "-in", file, "-inform", "PEM", "-out", file, "-outform", "DER"]
+        subprocess.call(cmdstr)
+        a = M2Crypto.X509.load_cert(file, format=FORMAT_DER)
 
-            der = a.as_der()
-            cert = nss.Certificate(der,certdb)
+      der = a.as_der()
+      cert = nss.Certificate(der, certdb)
 
-            s = hashlib.new("sha3_512")
-            cert_dec = DerSequence()
-            cert_dec.decode(der)
-            tbsCertificate = DerSequence()
-            try:
-                tbsCertificate.decode(cert_dec[0])
-            except:
-                continue
-            try:
-                spki = tbsCertificate[6]
-            except:
-                #FIXME observing some outcomes with the certificates given the len(tbs)-1 is spki
-                #I don't know why due to spki in the rfc is in the 7th position. BTW maybe you have to
-                #research in this and adapt it based in yours certificates. Also you can develop your own script
-                #but is important to use nss because the main program use subjectPublicKeyInfo.id_str + subject_common_name
-                spki = tbsCertificate[len(tbsCertificate)-1]
-            s.update(spki)
-            hash_t = s.hexdigest()
-            algorithm = cert.subject_public_key_info.algorithm.id_str
-            _id = str(algorithm) + ' - ' + cert.subject_common_name
-            exist = db.get(_id)
-            if exist == None:
-                db.set_pin(hash_t,_id,drop=False)
+      s = hashlib.new("sha3_512")
+      cert_dec = DerSequence()
+      cert_dec.decode(der)
+      tbsCertificate = DerSequence()
+      try:
+        tbsCertificate.decode(cert_dec[0])
+      except:
+        continue
+      try:
+        spki = tbsCertificate[6]
+      except:
+        #FIXME observing some outcomes with the certificates given the len(tbs)-1 is spki
+        #I don't know why due to spki in the rfc is in the 7th position. BTW maybe you have to
+        #research in this and adapt it based in yours certificates. Also you can develop your own script
+        #but is important to use nss because the main program use subjectPublicKeyInfo.id_str + subject_common_name
+        spki = tbsCertificate[len(tbsCertificate)-1]
+      s.update(spki)
+      hash_t = s.hexdigest()
+      algorithm = cert.subject_public_key_info.algorithm.id_str
+      _id = str(algorithm) + ' - ' + cert.subject_common_name
+      exist = db.get(_id)
+      if exist == None:
+        db.set_pin(hash_t, _id, drop = False)
 

@@ -5,18 +5,16 @@ class HandleStore(object):
     store = None
 
     def __init__(self):
-        self.store= {}
+        self.store = {}
 
 
-
-def handler(store,handler=False):
+def handler(store, isHandler=False):
     """
     decorator to set up our class as verification-class
     """
     def _handler(cls):
-        if handler:
+        if isHandler:
             store.store[cls.name] = cls
-
         return cls
     return _handler
 
@@ -29,6 +27,6 @@ from blacklist import Blacklist
 from rfcnss import Rfcnss
 from ocspcheck import OCSP
 from ct import CT
-from tlsa import TLSA
+from dane import Dane
 from pin import Pinning
 

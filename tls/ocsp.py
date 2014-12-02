@@ -17,16 +17,15 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-
-from  pyasn1.codec.der import decoder, encoder
+from pyasn1.codec.der import decoder, encoder
 from pyasn1_modules import rfc2560, rfc2459
 from pyasn1.type import univ
 import hashlib
 import M2Crypto.X509
 from M2Crypto.X509 import FORMAT_DER
-#from pyasn1.type.useful import GeneralizedTime
+# from pyasn1.type.useful import GeneralizedTime
 
-#All the code was extracted from  bit.ly/1mxntVN
+# All the code was extracted from  bit.ly/1mxntVN
 
 import re
 import urllib2
@@ -34,15 +33,20 @@ import urllib2
 sha1oid = univ.ObjectIdentifier((1, 3, 14, 3, 2, 26))
 
 
-#TODO research CT
-
 class ValueOnlyBitStringEncoder(encoder.encoder.BitStringEncoder):
-        #These methods just do not encode tag and legnth fields of TLV
-        def encodeTag(self, *args): return ''
-        def encodeLength(self,*args) : return ''
+        # These methods just do not encode tag and legnth fields of TLV
+        def encodeTag(self, *args):
+            return ''
+
+        def encodeLength(self, *args):
+            return ''
+
         def encodeValue(*args):
-            substrate, isConstructed = encoder.encoder.BitStringEncoder.encodeValue(*args)
-            #encoded bit-string value
+            (
+                substrate,
+                isConstructed
+            ) = encoder.encoder.BitStringEncoder.encodeValue(*args)
+            # encoded bit-string value
             return substrate[1:], isConstructed
 
         def __call__(self, bitStringValue):
@@ -54,25 +58,34 @@ class Ocsp:
     All the things related with ocsp
     """
 
-    def __init__(self,cert):
+    def __init__(self, cert):
         self.issuer_cert = cert.der_data(1)
         self.user_cert = cert.der_data()
         self._extract_ocsp_uri()
         self.valueOnlyBitStringEncoder = ValueOnlyBitStringEncoder()
         self.tbsResponseData = None
-        self.status,self.certID,self.thisUpdate,self.nextUpdate = self._check_ocsp()
+        (
+            self.status,
+            self.certID,
+            self.thisUpdate,
+            self.nextUpdate
+        ) = self._check_ocsp()
         self.serial = cert.serial_number()
         self.name = cert.ca_name()
 
-
-
     def get_response(self):
-        return (self.status,self.certID,self.thisUpdate,self.nextUpdate,self.serial,self.name)
-
+        return (
+            self.status,
+            self.certID,
+            self.thisUpdate,
+            self.nextUpdate,
+            self.serial,
+            self.name
+            )
 
     def _extract_ocsp_uri(self):
         try:
-            cert = M2Crypto.X509.load_cert_string(self.user_cert,FORMAT_DER)
+            cert = M2Crypto.X509.load_cert_string(self.user_cert, FORMAT_DER)
         except:
             self.ocsp_url = None
             return
@@ -82,26 +95,28 @@ class Ocsp:
             ext = cert.get_ext_at(index)
             certificateExtensions[ext.get_name()] = ext.get_value()
         try:
-            infos = [x.strip() for x in certificateExtensions["authorityInfoAccess"].split('\n')]
+            infos = [
+                x.strip() for x in
+                certificateExtensions["authorityInfoAccess"].split('\n')
+                ]
         except KeyError:
             self.ocsp_url = None
             return
         ocsp_url = None
         for info in infos:
             if re.match(r"^OCSP - URI:", info):
-                ocsp_url = info.replace("OCSP - URI:","")
+                ocsp_url = info.replace("OCSP - URI:", "")
                 break
         self.ocsp_url = ocsp_url
 
-
     def check_certificate_transparency(self):
-        if self.tbsResponseData == None:
+        if self.tbsResponseData is None:
             return
         response = self.tbsResponseData.getComponentByName('responses').getComponentByPosition(0)
         extensions = response.getComponentByName('singleExtensions')
-        ctoid = univ.ObjectIdentifier((1,3,6,1,4,1,11129,2,4,5))
+        ctoid = univ.ObjectIdentifier((1, 3, 6, 1, 4, 1, 11129, 2, 4, 5))
         sct = None
-        if extensions == None:
+        if extensions is None:
             return sct
         for extension in extensions:
             oid = extension.getComponentByPosition(0)
@@ -109,23 +124,20 @@ class Ocsp:
                 sct = str(extension.getComponentByPosition(2)).encode('hex')
         return sct
 
-
     def _check_ocsp(self):
-        #TODO check the time to avoid reply attacks
         self._get_ocsp_response()
-        if self.tbsResponseData == None:
-            return (None,None,None,None)
-        #print self.tbsResponseData.getComponentByName('responses').prettyPrint()
+        if self.tbsResponseData is None:
+            return (None, None, None, None)
         response = self.tbsResponseData.getComponentByName('responses').getComponentByPosition(0)
         certStatus = response.getComponentByName('certStatus').getName()
         certId = response.getComponentByName('certID').getComponentByName('serialNumber')
         thisUpdate = response.getComponentByName('thisUpdate')
         nextUpdate = response.getComponentByName('nextUpdate')
-        return (str(certStatus), certId,thisUpdate,nextUpdate)
+        return (str(certStatus), certId, thisUpdate, nextUpdate)
 
-    def make_ocsp_request(self,issuerCert, userCert):
+    def make_ocsp_request(self, issuerCert, userCert):
         issuerTbsCertificate = issuerCert.getComponentByName('tbsCertificate')
-        #issuerSubject = issuerTbsCertificate.getComponentByName('subject')
+        # issuerSubject = issuerTbsCertificate.getComponentByName('subject')
 
         userTbsCertificate = userCert.getComponentByName('tbsCertificate')
         userIssuer = userTbsCertificate.getComponentByName('issuer')
@@ -133,13 +145,11 @@ class Ocsp:
             encoder.encode(userIssuer)
             ).digest()
 
-
         issuerSubjectPublicKey = issuerTbsCertificate.getComponentByName('subjectPublicKeyInfo').getComponentByName('subjectPublicKey')
 
-        issuerKeyHash =  hashlib.sha1(
+        issuerKeyHash = hashlib.sha1(
             self.valueOnlyBitStringEncoder(issuerSubjectPublicKey)
             ).digest()
-
 
         userSerialNumber = userTbsCertificate.getComponentByName('serialNumber')
         # Build request object
@@ -179,15 +189,20 @@ class Ocsp:
             httpReq = urllib2.Request(
                 self.ocsp_url,
                 encoder.encode(ocspReq),
-                { 'Content-Type': 'application/ocsp-request' }
+                {'Content-Type': 'application/ocsp-request'}
                 )
             httpRsp = urllib2.urlopen(httpReq).read()
 
 # Process OCSP response
 
             ocspRsp, _ = decoder.decode(httpRsp, asn1Spec=rfc2560.OCSPResponse())
+            # print ocspRsp.getComponentByName('responseStatus')
             responseBytes = ocspRsp.getComponentByName('responseBytes')
-            response = responseBytes.getComponentByName('response')
+            try:
+                response = responseBytes.getComponentByName('response')
+            except:
+                self.tbsResponseData = None
+                return
 
             basicOCSPResponse, _ = decoder.decode(
                 response, asn1Spec=rfc2560.BasicOCSPResponse()

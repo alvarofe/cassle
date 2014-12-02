@@ -16,21 +16,16 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import threading
 from tls.cert import X509Chain
 from handlers import handlers
 from tls.ocsp import Ocsp
 import logging
 from conf import debug_logger
 
-
 logger = logging.getLogger(__name__)
-
-screen_lock = threading.Lock()
 
 
 class TLSVerificationDispatch():
-
     def __init__(self, data):
 
         self.certs = None
@@ -42,13 +37,11 @@ class TLSVerificationDispatch():
         self.dispatch_certificate()
         self.dispatch_status_request()
 
-
     def dispatch_certificate(self):
-        #screen_lock is only to print in the console
-        global screen_lock
-        #Do everything related with certificate
+        # screen_lock is only to print in the console
+        # Do everything related with certificate
         if self.certs is not None:
-            #verify certificate
+            # verify certificate
             try:
                 chain = X509Chain(self.certs)
             except Exception as e:
@@ -56,8 +49,13 @@ class TLSVerificationDispatch():
                 return
             if chain.length_chain() == 1:
                 try:
-                    debug_logger.debug('[-] Chain incomplete from %s' % chain.ca_name())
-                    logger.info("The chain is incomplete %s" % chain.subject_common_name())
+                    debug_logger.debug(
+                        '[-] Chain incomplete from %s' % chain.ca_name()
+                        )
+                    logger.info(
+                        "The chain is incomplete %s"
+                        % chain.subject_common_name()
+                        )
                 except Exception:
                     debug_logger.debug('[-] Chain incomplete')
                     logger.info('[-] Chain incomplete')
@@ -66,21 +64,19 @@ class TLSVerificationDispatch():
                 debug_logger.debug('[+] Verifying certificate')
                 for cls in handlers.store:
                     instance = handlers.store[cls]()
-                    if instance.cert == True:
+                    if instance.cert is True:
                         instance.on_certificate(chain)
-                    if instance.ocsp == True:
+                    if instance.ocsp is True:
                         instance.on_ocsp_response(ocsp)
         else:
             pass
 
-
     def dispatch_status_request(self):
         if self.dispatch_status_request is not None:
-            #verify connection through ocsp_stapling
-            #In the future only add here all the code needed
+            # verify connection through ocsp_stapling
+            # In the future only add here all the code needed
             pass
         else:
             pass
-
 
 

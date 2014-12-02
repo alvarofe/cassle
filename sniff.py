@@ -36,49 +36,56 @@ import logging.config
 
 scheduler = BackgroundScheduler()
 
+
 def drop():
     db = Database(config.DB_NAME, "pinning")
     db.drop_pinning()
 
+
 class Sniff:
     def __init__(self):
         parser = argparse.ArgumentParser(description='Certificate Validation')
-        parser.add_argument('-i','--interface',help='specify interface to sniff')
-        # This default is becuase I am using mac os x . If you use Linux is likely the interface be eth0/1
+        parser.add_argument(
+            '-i',
+            '--interface',
+            help='specify interface to sniff'
+            )
+        # This default is becuase I am using mac os x .
+        # If you use Linux is likely the interface be eth0/1
         parser.set_defaults(interface='en0')
         options = parser.parse_args()
-        if options.interface == None:
+        if options.interface is None:
             print parser.usage
             sys.exit(0)
 
         self.interface = options.interface
 
     def sniff(self):
-        global scheduler
-        p = pcap.pcapObject()
-        dev = self.interface
-        net, mask = pcap.lookupnet(dev)
-        p.open_live(dev, 1600, 0, 100)
-        p.setfilter("tcp src port 443", 0, 0)
-        try:
-            while 1:
-                p.dispatch(1, decode_packet)
-        except KeyboardInterrupt:
-            scheduler.shutdown()
-            print '%s' % sys.exc_type
-            print 'shutting down'
-            print '%d packets received, %d packets dropped, %d packets dropped by interface' % p.stats()
+            p = pcap.pcapObject()
+            dev = self.interface
+            net, mask = pcap.lookupnet(dev)
+            p.open_live(dev, 1600, 0, 100)
+            p.setfilter("tcp src port 443", 0, 0)
+            try:
+                while 1:
+                    p.dispatch(1, decode_packet)
+            except KeyboardInterrupt:
+                scheduler.shutdown()
+                print '%s' % sys.exc_type
+                print 'shutting down'
+                print '%d packets received, %d packets dropped, %d packets \
+                        dropped by interface' % p.stats()
 
 
 def init_ssl_blacklist():
     """
-    This function setup the sslblacklist database with our local database to use later in the validation process
+    This function setup the sslblacklist database with our local database to
+    use later in the validation process
     """
     import csv
-    from db.database import  Database
     fingerprints = list()
     file = urllib2.urlopen('https://sslbl.abuse.ch/blacklist/sslblacklist.csv')
-    reader  = csv.reader(file, delimiter=' ', quotechar='|')
+    reader = csv.reader(file, delimiter=' ', quotechar='|')
     for row in reader:
         try:
             fingerprints.append(row[1].split(',')[1])
@@ -89,34 +96,33 @@ def init_ssl_blacklist():
     print '[+] SSL blacklist downloaded'
 
 
-def stub_verify(conn,cert,errno,errdepth,code):
-    return True
-
 if __name__ == '__main__':
 
-    # This is to delete the pinning database each day to avoid that an evil site perform MITM attacks over our connections
-    # That's why because in our code we save the pinning each time that we visite a site. But if this site is evil we are saving bad pinning
-    # so we have to delete the database to ensure that evil site has been deleted. You can change the seconds in the configuration file
-
+    # This is to delete the pinning database each day to avoid that an evil
+    # site perform MITM attacks over our connections That's why because in our
+    # code we save the pinning each time that we visite a site. But if this
+    # site is evil we are saving bad pinning so we have to delete the database
+    # to ensure that evil site has been deleted. You can change the seconds
+    # in the configuration file
 
     scheduler.add_job(drop, 'interval', seconds=config.DB_TIME_REMOVE)
     scheduler.start()
 
-    #configure logger
+    # configure logger
 
     with open(os.path.expanduser(config.LOG_FILE)) as log:
         config_log = json.load(log)
     logging.config.dictConfig(config_log)
 
-
-    #Configure type of notifications
+    # Configure type of notifications
 
     MITMNotification.register(NotificationOSX())
 
     print '[+] Downloading SSL blacklist'
-    p = Process(target=init_ssl_blacklist, args=())
-    p.start()
+    proc = Process(target=init_ssl_blacklist, args=())
+    proc.start()
     print '[+] Sniffing'
 
     s = Sniff()
     s.sniff()
+
