@@ -1,6 +1,7 @@
+
 from handlers import handlers
 from handlers import handler
-from db.database import Database
+from db.database import PinDB
 from notification.event_notification import MITMNotification
 from handlers.base import BaseHandler
 from conf import config, debug_logger
@@ -14,11 +15,13 @@ logger = logging.getLogger(__name__)
 class KeyContinuity(BaseHandler):
 
     name = "keycontinuity"
-    cert = True
-    ocsp = False
+
+    def __init__(self, cert, ocsp):
+        super(KeyContinuity, self).__init__(cert, ocsp)
+        self.on_certificate(cert)
 
     def on_certificate(self, cert):
-        hash_t = cert.hash_spki()
+        hash_t = cert.hash_spki(algorithm="sha256")
         name = cert.subject_common_name()
         algorithm = cert.get_cert_nss().subject_public_key_info.algorithm
         algorithm = algorithm.id_str
@@ -27,7 +30,7 @@ class KeyContinuity(BaseHandler):
         if exist is None:
             # That means that the certificate is not in the db, it's the
             # first time it was seen
-            db.set_pin(hash_t, _id)
+            db.set_hash(hash_t, _id)
             debug_logger.debug("\t[+] Certificate %s first seen" % name)
         else:
             # Exist so we have to ensure that it is correct
@@ -39,13 +42,14 @@ class KeyContinuity(BaseHandler):
                     "\t[-] Certificate {0} has changed from".format(name) +
                     " \n{0}--->{1}\n ".format(before["_id"], before["hash"]) +
                     "to \n{0}--->{1}".format(algorithm, hash_t))
-                MITMNotification.notify(title=self.name, message=name)
+                MITMNotification.notify(
+                    title=self.name, message=name)
             else:
                 debug_logger.debug(
                     "\t[+] Certificate %s has not changed" % name)
 
-# This db is shared by all the instance of Pinning. It is not necessary
+# This db is shared by all the instance of keyContinuity. It is not necessary
 # create an instance each time that we use this class.
-db = Database(config.DB_NAME, KeyContinuity.name)
+db = PinDB(config.DB_NAME, KeyContinuity.name)
 
 

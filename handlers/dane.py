@@ -1,10 +1,16 @@
+
 from handlers import handlers, handler
 from handlers.base import BaseHandler
 import dns.resolver
 from conf import config, debug_logger
 import logging
 import hashlib
+import nss.nss as nss
+from tls import nssconfig
+from nss.error import NSPRError
 
+
+intended_usage = nss.certificateUsageSSLServer
 
 logger = logging.getLogger(__name__)
 
@@ -33,16 +39,45 @@ logger = logging.getLogger(__name__)
 class Dane(BaseHandler):
 
     name = "dane"
-    cert = True
-    ocsp = False
+
+    def __init__(self, cert, ocsp):
+        super(Dane, self).__init__(cert, ocsp)
+        self.on_certificate(cert)
+
+    def verify_chain(self, cert):
+        approved_usage = not intended_usage
+        try:
+            length = cert.length_chain()
+            if length > 4:
+                return False
+            cert_nss = cert.get_cert_nss()
+            certdb = nssconfig.certdb
+            approved_usage = cert_nss.verify_now(
+                certdb, True, intended_usage, None)
+        except NSPRError:
+            cert.add_to_nssdb(cert_nss.issuer.common_name, deep=1)
+            if length == 4:
+                inter = cert.get_cert_nss(deep=1)
+                cert.add_to_nssdb(inter.issuer.common_name, deep=2)
+            try:
+                approved_usage = cert_nss.verify_now(
+                    certdb, True, intended_usage, None)
+            except NSPRError:
+                pass
+
+        if approved_usage & intended_usage:
+            return True
+        else:
+            return False
 
     def on_certificate(self, cert):
+
         def verify(url):
             try:
                 answer = dns.resolver.query('_443._tcp.' + url, 'TLSA')
             except:
                 # print "Unexpected error:", sys.exc_info()[0]
-                return False
+                return -1
 
             (
                 cert_usage,
@@ -51,7 +86,7 @@ class Dane(BaseHandler):
                 associated_data
             ) = [str(ans) for ans in answer][0].split(' ')
             funct = [cert.der_data, cert.subject_public_key_info]
-            hash_funct = [None, hashlib.new('sha256'), hashlib.new('sha512')]
+            hash_funct = [None, hashlib.sha256, hashlib.sha512]
             temp = hash_funct[int(match_type)]
 
             # depend on the match_type we need use different algorithms
@@ -61,14 +96,14 @@ class Dane(BaseHandler):
                 # only the subjectPublicKeyInfo
                 data = funct[int(selector)]()
                 if temp is not None:
-                    temp.update(data)
-                    data = temp.hexdigest()
+                    m = temp(data)
+                    data = m.hexdigest()
                 if data == associated_data:
                     return True
                 else:
                     return False
 
-            if cert_usage == '0':
+            if cert_usage == '0' or cert_usage == '2':
                 # We must check for each certificate in the chain that the
                 # associated data is presented
 
@@ -80,16 +115,21 @@ class Dane(BaseHandler):
                 for cer in xrange(0, cert.length_chain()):
                     data = funct[int(selector)](deep=cer)
                     if temp is not None:
-                        temp.update(data)
-                        data = temp.hexdigest()
-                    print data, associated_data
+                        m = temp(data)
+                        data = m.hexdigest()
 
                     if data == associated_data:
-                        return True
-                    return False
-
-            if cert_usage == '2':
-                debug_logger.debug("\t[-] We do not support this yet")
+                        if cert_usage == '0':
+                            return True
+                        else:
+                            cert.add_to_nssdb(
+                                cert.subject_common_name(deep=cer),
+                                deep=cer)
+                            value = self.verify_chain(cert)
+                            cert.remove_from_nssdb(
+                                cert.subject_common_name(deep=cer)
+                                )
+                            return value
                 return False
 
         try:
@@ -115,6 +155,13 @@ class Dane(BaseHandler):
         if url[0] == '*':
             url = url.replace('*', 'www')
             result = verify(url)
+            if result is True:
+                debug_logger.debug(
+                    "\t[+] Certificate %s has a valid TLSA record" %
+                    cert.ca_name()
+                    )
+                return
+
             url = url.replace('www', '*')
 
         if url[0] == '*.':
@@ -127,8 +174,14 @@ class Dane(BaseHandler):
                 cert.ca_name()
                 )
             return
+        if result == -1:
+            debug_logger.debug(
+                "\t[-] Certificate {0} does not implement DANE".format(
+                    cert.ca_name()))
+            return
+
         debug_logger.debug(
             "\t[-] Certificate {0} has not a valid TLSA".format(
-                cert.ca_name()) + " record or it doesn't implement DANE")
+                cert.ca_name()))
 
 

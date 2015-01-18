@@ -1,7 +1,7 @@
 from handlers import handlers
 from handlers import handler
 from notification.event_notification import MITMNotification
-from db.database import Database
+from db.database import BlackListDB
 from handlers.base import BaseHandler
 from conf import config, debug_logger
 import logging
@@ -14,8 +14,10 @@ logger = logging.getLogger(__name__)
 class Blacklist(BaseHandler):
 
     name = "blacklist"
-    cert = True
-    ocsp = False
+
+    def __init__(self, cert, ocsp):
+        super(Blacklist, self).__init__(cert, ocsp)
+        self.on_certificate(cert)
 
     def on_certificate(self, cert):
         name = cert.ca_name()
@@ -34,9 +36,8 @@ class Blacklist(BaseHandler):
                 )
             MITMNotification.notify(
                 title=self.name,
-                message=cert.subject_common_name()
-                )
+                message=cert.subject_common_name())
 
-db = Database(config.DB_NAME, Blacklist.name)
+db = BlackListDB(config.DB_NAME, Blacklist.name)
 
 

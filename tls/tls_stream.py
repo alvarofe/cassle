@@ -24,8 +24,9 @@ from tls.tls_verification import TLSVerificationDispatch
 
 class TLSStream():
     """
-    Manage a TLSStream. Basically split tls_records retrieve handshake messages
-    to validate after through SSLVerificationDispatch.
+    Manage a TLSStream. Basically split tls_records and process each of them
+    to retrieve handshake messages to validate after through
+    TLSVerificationDispatch.
     """
 
     def __init__(self, raw_data):
@@ -93,7 +94,7 @@ class TLSStream():
 
         # You could augment this method to extract more message and add more
         # logic to the application. Sometimes after a server hello comes
-        # a certificate
+        # a certificate without the necessity to use a new tls record
 
         for record in self._record:
 
@@ -104,6 +105,7 @@ class TLSStream():
                     message_length
                 ) = struct.unpack_from("!BI", record, 0)
                 message_length >>= 8
+
                 if message_type == tls_types.TLS_H_TYPE_SERVER_HELLO:
                     data = record[4+message_length:]
                     _type, _length = struct.unpack_from("!BI", data, 0)

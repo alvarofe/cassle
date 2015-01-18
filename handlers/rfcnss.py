@@ -1,3 +1,4 @@
+
 from handlers import handlers
 from handlers import handler
 from notification.event_notification import MITMNotification
@@ -18,8 +19,10 @@ logger = logging.getLogger(__name__)
 class Rfcnss(BaseHandler):
 
     name = "rfcnss"
-    cert = True
-    ocsp = False
+
+    def __init__(self, cert, ocsp):
+        super(Rfcnss, self).__init__(cert, ocsp)
+        self.on_certificate(cert)
 
     def on_certificate(self, cert):
         approved_usage = not intended_usage
@@ -31,7 +34,9 @@ class Rfcnss(BaseHandler):
                     "It's a weird situtation")
                 MITMNotification.notify(
                     title="chain large",
-                    message=cert.subject_common_name())
+                    message=cert.subject_common_name(),
+                    group="NSS"
+                    )
                 return
             cert_nss = cert.get_cert_nss()
             name = cert.ca_name()
@@ -59,6 +64,7 @@ class Rfcnss(BaseHandler):
             logger.info(
                 "\t[-] Certificate %s is not safe using NSS library" % name)
             MITMNotification.notify(
-                title=self.name,
+                title="Chain of trust",
                 message=cert.subject_common_name())
+
 

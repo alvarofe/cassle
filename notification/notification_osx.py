@@ -1,11 +1,8 @@
 from pync import Notifier
-from notification.iobserver import IObserver
-import zope.interface
+from notification.event_notification import IObserver
 
 
-class NotificationOSX():
-
-    zope.interface.implements(IObserver)
+class NotificationOSX(IObserver):
 
     def notify(self, *args, **kw):
         """docstring for notify"""
@@ -16,6 +13,6 @@ class NotificationOSX():
             message_l = kw["message"]
         if "title" in keys:
             title_l = kw["title"]
-        Notifier.notify(title_l, title=message_l)
+        Notifier.notify(message_l, title=title_l)
 
 

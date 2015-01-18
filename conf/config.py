@@ -23,4 +23,3 @@ ICSI_MAXIMUM_INTERVAL = 30
 
 DEBUG = True
 LOG_FILE = "~/Projects/Python/pfc-pruebas/pfc/conf/logging.json"
-

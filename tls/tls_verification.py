@@ -21,13 +21,13 @@ from handlers import handlers
 from tls.ocsp import Ocsp
 import logging
 from conf import debug_logger
+# from multiprocessing import Process
 
 logger = logging.getLogger(__name__)
 
 
-class TLSVerificationDispatch():
+class TLSVerificationDispatch:
     def __init__(self, data):
-
         self.certs = None
         self.status_request = None
         if 'cert' in data:
@@ -38,14 +38,12 @@ class TLSVerificationDispatch():
         self.dispatch_status_request()
 
     def dispatch_certificate(self):
-        # screen_lock is only to print in the console
         # Do everything related with certificate
         if self.certs is not None:
             # verify certificate
             try:
                 chain = X509Chain(self.certs)
-            except Exception as e:
-                print e
+            except Exception:
                 return
             if chain.length_chain() == 1:
                 try:
@@ -63,11 +61,8 @@ class TLSVerificationDispatch():
                 ocsp = Ocsp(chain)
                 debug_logger.debug('[+] Verifying certificate')
                 for cls in handlers.store:
-                    instance = handlers.store[cls]()
-                    if instance.cert is True:
-                        instance.on_certificate(chain)
-                    if instance.ocsp is True:
-                        instance.on_ocsp_response(ocsp)
+                    handlers.store[cls](chain, ocsp)
+
         else:
             pass
 

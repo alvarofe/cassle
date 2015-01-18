@@ -1,10 +1,8 @@
-import zope.interface
+class IObserver():
 
-class IObserver(zope.interface.Interface):
-    def notify(*args,**kw):
-        """
-        You must implement this interface to receive notification when a possible MITM
-        happens
-        """
-
-
+    """
+    You must inherit this class to receive notification
+    when a possible MITM happens
+    """
+    def notify(self, *args, **kw):
+        pass

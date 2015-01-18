@@ -25,7 +25,7 @@ from utils.util import decode_packet
 from multiprocessing import Process
 import os
 from conf import config
-from db.database import Database
+from db.database import PinDB, BlackListDB
 from apscheduler.schedulers.background import BackgroundScheduler
 from notification.event_notification import MITMNotification
 from notification.notification_osx import NotificationOSX
@@ -37,8 +37,12 @@ import logging.config
 scheduler = BackgroundScheduler()
 
 
+log_ap = logging.getLogger("apscheduler.scheduler")
+log_ap.disabled = 1
+
+
 def drop():
-    db = Database(config.DB_NAME, "pinning")
+    db = PinDB(config.DB_NAME, "keycontinuity")
     db.drop_pinning()
 
 
@@ -50,22 +54,29 @@ class Sniff:
             '--interface',
             help='specify interface to sniff'
             )
+        parser.add_argument(
+            '-p',
+            '--port',
+            help='specify the port to sniff'
+            )
         # This default is becuase I am using mac os x .
         # If you use Linux is likely the interface be eth0/1
         parser.set_defaults(interface='en0')
+        parser.set_defaults(port='443')
         options = parser.parse_args()
         if options.interface is None:
             print parser.usage
             sys.exit(0)
 
         self.interface = options.interface
+        self.port = options.port
 
     def sniff(self):
             p = pcap.pcapObject()
             dev = self.interface
             net, mask = pcap.lookupnet(dev)
             p.open_live(dev, 1600, 0, 100)
-            p.setfilter("tcp src port 443", 0, 0)
+            p.setfilter("tcp src port %s" % self.port, 0, 0)
             try:
                 while 1:
                     p.dispatch(1, decode_packet)
@@ -91,7 +102,7 @@ def init_ssl_blacklist():
             fingerprints.append(row[1].split(',')[1])
         except:
             pass
-    db = Database(config.DB_NAME, "blacklist")
+    db = BlackListDB(config.DB_NAME, "blacklist")
     db.set_black_list(fingerprints)
     print '[+] SSL blacklist downloaded'
 
@@ -116,7 +127,8 @@ if __name__ == '__main__':
 
     # Configure type of notifications
 
-    MITMNotification.register(NotificationOSX())
+    if sys.platform == "darwin":
+        MITMNotification.register(NotificationOSX())
 
     print '[+] Downloading SSL blacklist'
     proc = Process(target=init_ssl_blacklist, args=())

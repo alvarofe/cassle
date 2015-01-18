@@ -1,3 +1,4 @@
+
 from handlers import handlers
 from handlers import handler
 from notification.event_notification import MITMNotification
@@ -15,8 +16,10 @@ logger = logging.getLogger(__name__)
 class Icsi(BaseHandler):
 
     name = "icsi"
-    cert = True
-    ocsp = False
+
+    def __init__(self, cert, ocsp):
+        super(Icsi, self).__init__(cert, ocsp)
+        self.on_certificate(cert)
 
     def on_certificate(self, cert):
             address = cert.hash()+'.notary.icsi.berkeley.edu'
@@ -27,6 +30,9 @@ class Icsi(BaseHandler):
                     rdtype=dns.rdatatype.TXT
                     )[0].__str__().split()
             except:
+                MITMNotification.notify(
+                    title="ICSI-NO Certificate",
+                    message=cert.subject_common_name())
                 debug_logger.debug(
                     "\t[-] Certificate %s isn't in icsi notary" % name
                     )
@@ -43,21 +49,20 @@ class Icsi(BaseHandler):
                     "\t[-] Certificate {0}".format(name) +
                     "is not safe through icsi notary")
                 MITMNotification.notify(
-                    title="ICSI",
+                    title="ICSI-NO valid",
                     message=cert.subject_common_name())
             else:
                 s = last_seen - first_seen + 1
-            if s - times_seen >= config.ICSI_MAXIMUM_INTERVAL:
-                debug_logger.debug(
-                    "\t[-] Certificate {0}".format(name) +
-                    " is not enough secure acording with icsi notary")
-                MITMNotification.notify(
-                    title='ICSI',
-                    message=cert.subject_common_name())
-            else:
-                debug_logger.debug(
-                    "\t[+] Certificate %s is secure through icsi notary"
-                    % name)
-
+                if s - times_seen >= config.ICSI_MAXIMUM_INTERVAL:
+                    debug_logger.debug(
+                        "\t[-] Certificate {0}".format(name) +
+                        " is not enough secure acording with icsi notary")
+                    MITMNotification.notify(
+                        title='ICSI-NO famous',
+                        message=cert.subject_common_name())
+                else:
+                    debug_logger.debug(
+                        "\t[+] Certificate %s is secure through icsi notary"
+                        % name)
 
 

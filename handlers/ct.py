@@ -7,6 +7,7 @@ from pyasn1.codec.ber import decoder
 from utils.sct_deser import DeserializeSCTList, DeserializeSCT
 from datetime import datetime
 import time
+from notification.event_notification import MITMNotification
 
 
 logger = logging.getLogger(__name__)
@@ -16,13 +17,12 @@ logger = logging.getLogger(__name__)
 class CT(BaseHandler):
 
     name = "ct"
-    cert = True
-    ocsp = True
 
-    def __init__(self):
+    def __init__(self, cert, ocsp):
+        super(CT, self).__init__(cert, ocsp)
         self._process_ocsp = False
-        self._lock = False
         self._ca_name = ''
+        self.on_certificate(cert)
 
     def check_sct(self, sct):
         sct = decoder.decode(sct)[0]
@@ -43,32 +43,23 @@ class CT(BaseHandler):
                 debug_logger.debug(
                     "\t[-] SCT not valid. Timestamp" +
                     " in the future")
+                MITMNotification.notify(
+                    title="CT", message="SCT in the future")
 
     def on_certificate(self, cert):
         sct = cert.get_ct_extension()
         if sct is not None:
             self.check_sct(sct)
-            # debug_logger.debug(
-            # "\t[+] Certificate %s has SCT %s"
-            # % (cert.ca_name(), sct.encode('hex')))
         else:
-            self._process_ocsp = True
+            self.on_ocsp_response(self._ocsp)
             self._ca_name = cert.ca_name()
-        self._lock = True
 
     def on_ocsp_response(self, ocsp):
-        while self._lock is False:
-            pass
-        if self._process_ocsp is True:
-            sct = ocsp.check_certificate_transparency()
-            if sct is not None:
-                self.check_sct(sct)
-                # debug_logger.debug(
-                # "\t[+] Certificate %s has SCT %s" %
-                # (self._ca_name, sct.encode('hex')))
-            else:
-                debug_logger.debug(
-                    "\t[-] Certificate %s has not SCT" % self._ca_name)
-
+        sct = ocsp.check_certificate_transparency()
+        if sct is not None:
+            self.check_sct(sct)
+        else:
+            debug_logger.debug(
+                "\t[-] Certificate %s has not SCT" % self._ca_name)
 
 

@@ -16,100 +16,105 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
-
-# This class describes the connection with the database, in this case with MongoDB. It uses to
-# store everything related with pinning stuff
+# This class describes the connection with the database, in this case with
+# MongoDB. It uses to store everything related with pinning stuff
 
 from pymongo import MongoClient
 
-class Database:
 
-        def __init__(self,db_name,collection):
+# this class will serve as base class
+class Database(object):
+
+        def __init__(self, db_name, collection):
             """
             Constructor of this class
             Parameters:
                 -db_name: The database name
                 -collection: The collection inside our database
 
-            Comment: Change the localhost and 27017 if you want change the location of database
+            Comment: Change the localhost and 27017 if you want change the
+            location of database
             """
+            super(Database, self).__init__()
             self._db_name = db_name
             self._collection = collection
-            connection = MongoClient("localhost",27017)
+            connection = MongoClient("localhost", 27017)
             self.db = connection[db_name]
             self.collection = self.db[collection]
 
-        def get(self,id):
+        def get(self, id_):
             """
             Return object saved with that id
 
             Parameters:
                 -id : id that we want to return
             """
-            return self.collection.find_one({ "_id" : id})
+            return self.collection.find_one({"_id": id_})
 
-        def compare(self,canickname,hash_t):
+
+class PinDB(Database):
+
+    def __init__(self, db_name, collection):
+        super(PinDB, self).__init__(db_name, collection)
+
+    def set_hash(self, hash_t, id_, drop=True):
             """
-            Method to compare the hash of new certificate with one that exist.
-            It's used in the validation process
-
-            Paramaters:
-                -canickname: Name of our certificate CA commonly known as ca-name
-                -hash_t: Hash that we want to compare against the hash in the certificate with the ca-name provide before
-            """
-            value_in_db = self.get(canickname)
-            if value_in_db["hash"] == hash_t:
-                return True
-            else:
-                # This means a MITM attack because the hash changed
-                return False
-
-        def set_rfc(self,common_name):
-            """
-            Method to only log one certificate. The first one that was seen
-
-            Paramaters:
-                -common-name: The common-name of our certificate
-            """
-            data = {
-                    "_id": common_name
-                    }
-            query_result = self.get(common_name)
-            if query_result is None:
-                self.collection.insert(data)
-                return True
-            else:
-                return False
-
-
-        def set_pin(self,hash_t,canickname,drop=True):
-            """
-            Method to set a pin for a ca_nickname. Given a canickname we save in the database the pin
+            Method to set a pin for a id_.
 
             Paramaters:
                 -hash_t: Pin of our certificate
                 -canickname: ca-name of our cerficate
             """
             data = {
-                    "_id" :  canickname,
-                    "hash" : hash_t,
-                    "drop" : drop
-                    }
-            # but first to insert it is a good practice to see if exists other element with
-            # the same id
-            query_result = self.collection.find_one({"_id": canickname})
+                "_id":  id_,
+                "hash": hash_t,
+                "drop": drop
+                }
+            # but first to insert it is a good practice to see if exists other
+            # element with the same id
+            query_result = self.collection.find_one({"_id": id_})
             if query_result is None:
                 # We can insert it
                 self.collection.insert(data)
-                # This true value denotes that everything was fine
+                # This value denotes that everything was fine
                 return True
             else:
-                # That means that exist a pin for that certificate. This could be a error to try put the same certificate twice or something wrong happened.
-                # Depends where this value is returned, we must be careful as it is treated
+                # That means that exist a pin for that certificate.
+                # This could be a error to try put the same certificate twice
+                # or something wrong happened. Depends where this value is
+                # returned, we must be careful as it is treated
                 return False
 
-        def set_black_list(self,fingerprint_list):
+    def compare(self, id_, hash_t):
+            """
+            Method to compare the hash of new certificate with one that exist.
+            It's used in the validation process
+
+            Paramaters:
+            -id_: Identity to compare
+            -hash_t: Hash that we want to compare against the hash in the
+                   record saved with the id_ especified
+            """
+            value_in_db = self.get(id_)
+            if value_in_db["hash"] == hash_t:
+                return True
+            else:
+                # This means a MITM attack because the hash changed
+                return False
+
+    def drop_pinning(self):
+            """
+            Remove all the pinning whose property drop is set to True
+            """
+            self.collection.remove({"drop": True})
+
+
+class BlackListDB(Database):
+
+    def __init__(self, db_name, collection):
+        super(BlackListDB, self).__init__(db_name, collection)
+
+    def set_black_list(self, fingerprint_list):
             """
             Method to setup the black list database
 
@@ -119,27 +124,7 @@ class Database:
             for finger in fingerprint_list:
                 query = self.get(finger)
                 if query is None:
-                    self.collection.insert({"_id":finger})
-
-
-        def drop_pinning(self):
-            """
-            Remove all the pinning whose property drop is set to True
-            """
-            if self._collection == "pinning":
-                self.collection.remove({"drop" : True})
-            else:
-                return
+                    self.collection.insert({"_id": finger})
 
 
 
-
-
-
-# Only use for test
-if __name__ == '__main__':
-    db = Database("pfc", "pinning")
-    db.set_pin(8098098098, "Verisign")
-    print db.get("Verisign")
-    print db.compare("Verisign", 8098098098)
-    print db.compare("Verisign", 80998098)
