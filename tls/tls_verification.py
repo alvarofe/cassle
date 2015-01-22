@@ -35,7 +35,7 @@ class TLSVerificationDispatch:
         if 'status_request' in data:
             self.status_request = data['status_request']
         self.dispatch_certificate()
-        self.dispatch_status_request()
+        # self.dispatch_status_request()
 
     def dispatch_certificate(self):
         # Do everything related with certificate

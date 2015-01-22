@@ -29,10 +29,10 @@ class Blacklist(BaseHandler):
                 )
         else:
             debug_logger.debug(
-                "\t[-] Certificate %s match with a malware site" % name
+                "\t[-] Certificate %s matched with a malware site" % name
                 )
             logger.info(
-                "\t[-] Certificate %s match with a malware site" % name
+                "\t[-] Certificate %s matched with a malware site" % name
                 )
             MITMNotification.notify(
                 title=self.name,

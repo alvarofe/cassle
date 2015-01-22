@@ -36,7 +36,12 @@ class OCSP(BaseHandler):
         serial = self._cert.serial_number()
 
         issuer = self._cert.der_data(1)
-        issuer_der = decoder.decode(issuer, asn1Spec=rfc2459.Certificate())[0]
+        try:
+            issuer_der = decoder.decode(
+                issuer, asn1Spec=rfc2459.Certificate())[0]
+        except:
+            debug_logger.debug("\t[-] ERROR parsing")
+            return
         issuerTbsCert = issuer_der.getComponentByName('tbsCertificate')
         issuerSubjectPublicKey = issuerTbsCert.getComponentByName(
             'subjectPublicKeyInfo').getComponentByName('subjectPublicKey')

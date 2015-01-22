@@ -70,20 +70,14 @@ class Ocsp:
         self.valueOnlyBitStringEncoder = ValueOnlyBitStringEncoder()
         self.tbsResponseData = None
         (
-            self.status,
-            self.certID,
-            self.thisUpdate,
-            self.nextUpdate,
-            self.issuerHashz
+            self.status, self.certID, self.thisUpdate,
+            self.nextUpdate, self.issuerHashz
         ) = self._check_ocsp()
 
     def get_response(self):
         return (
-            self.status,
-            self.certID,
-            self.thisUpdate,
-            self.nextUpdate,
-            self.issuerHashz
+            self.status, self.certID, self.thisUpdate,
+            self.nextUpdate, self.issuerHashz
             )
 
     def _extract_ocsp_uri(self):

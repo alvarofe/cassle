@@ -3,13 +3,14 @@ sys.path.append("../")
 from db.database import PinDB
 from conf import config
 
+
 def introduction():
     print " ** SET-UP YOUR PIN TO AUGMENT YOUR SECURITY **\n"
     print " The structure in the db is as follows: \n"
     print """ \t"_id" : "*.facebook.com",
     "issuers" : {
-        "DigiCert High Assurance CA-3" : ["hash_spki in sha3_512"],
-                "Other Intermediate CA" : ["hash_spki in sha3_512"]
+        "DigiCert High Assurance CA-3" : ["Base64 fingerprint sha256"],
+                "Other Intermediate CA" : ["Base64 fingerprint sha256"]
     }"""
 
 

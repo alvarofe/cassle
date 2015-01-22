@@ -107,11 +107,6 @@ class Dane(BaseHandler):
                 # We must check for each certificate in the chain that the
                 # associated data is presented
 
-                # if you visit https://fedoraproject.org the TLSA record is as
-                # follow: 0 0 1 (associated data) but the chain is only 2 maybe
-                # the associated data is related with the root CA so we are not
-                # able to match that because of we do not have the whole chain.
-
                 for cer in xrange(0, cert.length_chain()):
                     data = funct[int(selector)](deep=cer)
                     if temp is not None:
