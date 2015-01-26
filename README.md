@@ -64,7 +64,7 @@ $ python nssdb.py -a False 2> /dev/null
 -
 ###### OPTIONAL
 
-To configure for example a pin, to be protected against attacks to Facebook.
+To configure for example a pin, to be protected against attacks to Facebook. The information provide may be fake since by now there is no way to extract such information securely.
 
 ```bash
 $ cd utils
@@ -77,7 +77,7 @@ $ python gatherinfo.py -s www.facebook.com -p
 $ python pin.py
 ```
 
-After executing the script pin.py fill everything with the data provided by gatherinfo.py. All this script can be changed to suit the necessity of the user.
+Fill everything with the data provided by gatherinfo.py. All this script can be changed to suit the necessity of the user.
 
 Once that everything is ready execute.
 
@@ -86,9 +86,14 @@ $ ./sniff.py -i <interface> -p <port>
 ```
 
 
+TODO
+====
 
++ Add DNSSEC support since by now we do not provide DANE verification
+
++ Verify SCT from CT. There is no way to extract the log's public key
 
 State
 =====
-#### WIP 
+#### WIP
 The project try to study some techniques that exist nowadays to validate the certificate. Some of them are not mature enough and have some limitations. Try your own methodology and change whatever you think.
