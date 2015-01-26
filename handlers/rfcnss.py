@@ -54,6 +54,10 @@ class Rfcnss(BaseHandler):
                     certdb, True, intended_usage, None)
             except NSPRError:
                 pass
+            cert.remove_from_nssdb(cert_nss.issuer.common_name)
+            if length == 4:
+                cert.remove_from_nssdb(inter.issuer.common_name)
+
 
         if approved_usage & intended_usage:
             debug_logger.debug(
