@@ -1,5 +1,4 @@
 Advanced Architecture to validate TLS certificates
-<https://github.com/alvarofe/certs-mitm>
 
 Introduction
 ============
