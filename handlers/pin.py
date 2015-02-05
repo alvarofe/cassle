@@ -48,7 +48,7 @@ class Pinning(BaseHandler):
             MITMNotification.notify(
                 title="Pinning",
                 message="Issuer different")
-            debug_logger.debug("\t[-] issuer with different name")
+            debug_logger.debug("\t[-] issuer with different name %s" % name)
 
 
 db = PinDB(config.DB_NAME, "pinning")
