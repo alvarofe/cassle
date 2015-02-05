@@ -82,7 +82,7 @@ Fill everything with the data provided by gatherinfo.py. All this script can be 
 Once that everything is ready execute.
 
 ```bash
-$ ./sniff.py -i <interface> -p <port>
+$ ./cassle.py -i <interface> -p <port>
 ```
 
 
