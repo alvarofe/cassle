@@ -29,6 +29,8 @@ from notification.event_notification import MITMNotification
 
 # All the code was extracted from  bit.ly/1mxntVN
 
+# TODO improve this code
+
 import re
 import urllib2
 

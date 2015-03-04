@@ -23,13 +23,14 @@ import sys
 import os
 sys.path.append("../")
 from conf import config
+import M2Crypto.X509
+from M2Crypto.X509 import FORMAT_PEM
 
 
 if __name__ == '__main__':
-    parser = optparse.OptionParser("usage: %prog -a <True/False>")
-    parser.add_option(
-        '-a', '--add', dest='add', default=True,
-        help='Bool indicate if add or substrate cert')
+    parser = optparse.OptionParser("usage: %prog -a ")
+    parser.add_option('--add', action='store_true', dest='add', help='Flag that indicate that you want add certificates to NSSDB')
+    parser.add_option('--delete', action='store_false', dest='add',  help='Flag that indicate that you want delete certificates from NSSDB')
     certs = os.path.expanduser(config.CERTS_DIR)
     certdb = os.path.expanduser(config.NSS_DB_DIR)
 
@@ -41,17 +42,32 @@ if __name__ == '__main__':
     if opts.add is True:
         for i in os.listdir(certs):
             if os.path.isfile(os.path.join(certs, i)):
-                j = i.replace('_-_', ' ').replace('_', ' ').strip('.crt')
+                file = certs+i
+
+                #Avoid hidden files
+                if i.startswith('.'):
+                    continue
+                # To convert to PEM encoding
                 cmdstr = [
                     "openssl", "x509", "-in", certs+i, "-inform",
                     "DER", "-out", certs+i, "-outform", "PEM"]
-                subprocess.call(cmdstr)
-                subprocess.call([
-                    "certutil", "-A", "-n", j, '-t', 'C,,,',
-                    '-a', '-i', certs+i, '-d', certdb])
+
+                # Avoid some noise on the screen
+                with open(os.devnull, "w") as fnull:
+                    subprocess.call(cmdstr, stdout=fnull, stderr=fnull)
+                cert = M2Crypto.X509.load_cert(file,format=FORMAT_PEM)
+                title = cert.get_subject()
+                with open(os.devnull,"w") as fnull:
+                    subprocess.call(
+                        ["certutil", "-A", "-n", str(title), '-t', 'C,,,', '-a', '-i', certs+i, '-d', certdb], stderr=fnull)
     else:
         for i in os.listdir(certs):
             if os.path.isfile(os.path.join(certs, i)):
-                j = i.replace('_-_', ' ').replace('_', ' ').strip('.crt')
-                subprocess.call(["certutil", "-D", "-n", j, '-d', certdb])
+                if i.startswith('.'):
+                    continue
+                file  = certs+i
+                cert = M2Crypto.X509.load_cert(file,format=FORMAT_PEM)
+                title = cert.get_subject()
+                with open(os.devnull,"w") as fnull:
+                    subprocess.call(["certutil", "-D", "-n", str(title), '-d', certdb], stderr=fnull)
 

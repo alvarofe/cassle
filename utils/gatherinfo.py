@@ -11,11 +11,15 @@ import subprocess
 import nss.nss as nss
 from tls import nssconfig
 import base64
+from db.database import PinDB
+from conf import config
 
 BEGIN = "-----BEGIN CERTIFICATE-----"
 END = "-----END CERTIFICATE-----"
 
 
+
+# TODO add support with mongo and pin everything and rewrite it a little bit
 def get_pin(server, algo):
     first_cmd = [
         'openssl', 's_client', '-connect', server+":443", '-showcerts',
@@ -43,6 +47,7 @@ def get_pin(server, algo):
     print "[+] PIN\n\t _id: %s" % cert.subject_common_name
     print "\t issuer : %s" % cert.issuer.common_name
     print "\t\t Base64 of SPKI with %s: %s" % (algo, spki_b64)
+    return (cert.subject_common_name, cert.issuer.common_name, spki_b64)
 
 
 def get_X509_from_string_pem(data):
@@ -98,24 +103,30 @@ def get_key(server, algorithm):
     print "\t Key of type: %s" % id
 
 
+def merge_dict(first, second):
+    """
+    That function merge the second dict in the first one
+    """
+    for key in second:
+        if key in first:
+            for value in second[key]:
+                first[key].append(value)
+        else:
+            first[key] = second[key]
+    return first
+
+
 def main(argv):
     key = False
     pin = False
     parser = argparse.ArgumentParser(description='Gather')
-    parser.add_argument(
-        '-s', '--server', dest="server", help="name of server")
-    parser.add_argument(
-        '-k', action='store_true', dest='key',
-        help='Indicates that you want the key of the server')
-    parser.add_argument(
-        '-p', action='store_true', dest="pin",
-        help='Indicate that you want extract pin')
-    parser.add_argument(
-        '-a', '--algorithm', dest='algo',
-        help='Hash algorithm to use')
-    parser.add_argument(
-        '-f', '--file', dest='file', help="File to a certificate")
+    parser.add_argument('-s', '--server', dest="server", help="name of server")
+    parser.add_argument('-k', action='store_true', dest='key', help='Indicates that you want the key of the server')
+    parser.add_argument('-p', action='store_true', dest="pin", help='Indicate that you want extract pin')
+    parser.add_argument('-a', '--algorithm', dest='algo', help='Hash algorithm to use')
+    parser.add_argument('-f', '--file', dest='file', help="File to a certificate")
     parser.set_defaults(algo='sha256')
+
     options = parser.parse_args()
     if options.server is not None:
         server = options.server
@@ -126,7 +137,26 @@ def main(argv):
         if key is True:
             get_key(server, algo)
         if pin is True:
-            get_pin(server, algo)
+            (_id, issuer, b64_pki) =  get_pin(server, algo)
+            answer = raw_input("Do you want to include it in the DB (y/n): ")
+            if answer == 'y' or answer == 'Y':
+                db = PinDB(config.DB_NAME,"pinning")
+                collection = db.collection
+                pin = dict()
+                pin["_id"] = _id
+                pin["issuers"] = dict()
+                pin["issuers"][issuer] = list()
+                pin["issuers"][issuer].append(b64_pki)
+                exist = collection.find_one({"_id" : pin["_id"]})
+                if exist is None:
+                    collection.insert(pin)
+                else:
+                    exist = merge_dict(exist["issuers"], pin["issuers"])
+                    collection.update({"_id" : pin["_id"]}, exist)
+                print "Database updated"
+
+
+
     if options.file is not None:
         get_key_from_file(options.file, options.algo)
 

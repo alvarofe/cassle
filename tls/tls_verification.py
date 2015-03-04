@@ -58,6 +58,7 @@ class TLSVerificationDispatch:
                     debug_logger.debug('[-] Chain incomplete')
                     logger.info('[-] Chain incomplete')
             else:
+                # TODO ask ocsp status when is only necessary
                 ocsp = Ocsp(chain)
                 debug_logger.debug('[+] Verifying certificate')
                 for cls in handlers.store:

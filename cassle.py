@@ -26,19 +26,22 @@ from multiprocessing import Process
 import os
 from conf import config
 from db.database import PinDB, BlackListDB
-from apscheduler.schedulers.background import BackgroundScheduler
+#from apscheduler.schedulers.background import BackgroundScheduler
 from notification.event_notification import MITMNotification
-from notification.notification_osx import NotificationOSX
 import urllib2
 import json
 import logging.config
 
 
-scheduler = BackgroundScheduler()
+
+#scheduler = BackgroundScheduler()
+
+#TODO improve logging
 
 
 log_ap = logging.getLogger("apscheduler.scheduler")
 log_ap.disabled = 1
+
 
 
 def drop():
@@ -46,19 +49,12 @@ def drop():
     db.drop_pinning()
 
 
+
 class Sniff:
     def __init__(self):
         parser = argparse.ArgumentParser(description='Certificate Validation')
-        parser.add_argument(
-            '-i',
-            '--interface',
-            help='specify interface to sniff'
-            )
-        parser.add_argument(
-            '-p',
-            '--port',
-            help='specify the port to sniff'
-            )
+        parser.add_argument('-i', '--interface', help='specify interface to sniff')
+        parser.add_argument('-p', '--port', help='specify the port to sniff')
         # This default is becuase I am using mac os x .
         # If you use Linux is likely the interface be eth0/1
         parser.set_defaults(interface='en0')
@@ -72,20 +68,20 @@ class Sniff:
         self.port = options.port
 
     def sniff(self):
-            p = pcap.pcapObject()
-            dev = self.interface
-            net, mask = pcap.lookupnet(dev)
-            p.open_live(dev, 1600, 0, 100)
-            p.setfilter("tcp src port %s" % self.port, 0, 0)
-            try:
-                while 1:
-                    p.dispatch(1, decode_packet)
-            except KeyboardInterrupt:
-                scheduler.shutdown()
-                print '%s' % sys.exc_type
-                print 'shutting down'
-                print '%d packets received, %d packets dropped, %d packets \
-                        dropped by interface' % p.stats()
+        p = pcap.pcapObject()
+        dev = self.interface
+        net, mask = pcap.lookupnet(dev)
+        p.open_live(dev, 1600, 1, 100)
+        p.setfilter("tcp src port %s" % self.port, 0, 0)
+        try:
+            while 1:
+                p.dispatch(1, decode_packet)
+        except KeyboardInterrupt:
+            #scheduler.shutdown()
+            print '%s' % sys.exc_type
+            print 'shutting down'
+            print '%d packets received, %d packets dropped, %d packets \
+                    dropped by interface' % p.stats()
 
 
 def init_ssl_blacklist():
@@ -116,8 +112,8 @@ if __name__ == '__main__':
     # to ensure that evil site has been deleted. You can change the seconds
     # in the configuration file
 
-    scheduler.add_job(drop, 'interval', seconds=config.DB_TIME_REMOVE)
-    scheduler.start()
+    #scheduler.add_job(drop, 'interval', seconds=config.DB_TIME_REMOVE)
+    #scheduler.start()
 
     # configure logger
 
@@ -128,6 +124,7 @@ if __name__ == '__main__':
     # Configure type of notifications
 
     if sys.platform == "darwin":
+        from notification.notification_osx import NotificationOSX
         MITMNotification.register(NotificationOSX())
 
     print '[+] Downloading SSL blacklist'

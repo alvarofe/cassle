@@ -2,7 +2,7 @@ import nss.nss as nss
 import os
 import hashlib
 from Crypto.Util.asn1 import DerSequence
-import sha3
+#import sha3
 import tempfile
 import subprocess
 import M2Crypto.X509

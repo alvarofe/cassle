@@ -10,6 +10,9 @@ import base64
 logger = logging.getLogger(__name__)
 
 
+
+#TODO rewrite this handler to do it properly
+
 @handler(handlers, isHandler=config.V_PINNING)
 class Pinning(BaseHandler):
 
